@@ -1,0 +1,1615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SUCH Monitoring</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root { --green:#14632F; --ink:#1C2321; --muted:#4B5563; --line:#DCE3DA; --bg:#F3F5F1; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:#fff; border-bottom:1px solid var(--line); padding:16px 24px; }
+  header b { color:var(--green); font-size:22px; letter-spacing:1px; }
+  header span { display:block; font-size:13px; color:var(--muted); }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px; display:flex; flex-direction:column; gap:16px; }
+  section { background:#fff; border:1px solid var(--line); border-radius:10px; padding:20px; }
+  h2 { margin:0 0 12px; font-size:17px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:13px; font-weight:600; color:var(--muted); }
+  input, select { font:inherit; font-size:14px; padding:10px; border:1px solid #C7D0C5; border-radius:6px; min-height:44px; color:var(--ink); background:#fff; }
+  button { font:inherit; font-weight:700; font-size:14px; min-height:44px; padding:0 18px; border-radius:8px; border:1px solid var(--green); background:var(--green); color:#fff; cursor:pointer; }
+  button.secondary { background:#fff; color:var(--green); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:12px; }
+  .status { font-size:14px; }
+  .ok { color:#1F7A3A; } .warn { color:#6B5300; } .err { color:#B71C1C; }
+  .note { font-size:13px; color:var(--muted); }
+  .box { overflow-x:auto; margin-top:12px; }
+  table { border-collapse:collapse; width:100%; font-size:12px; }
+  th, td { text-align:left; padding:6px 8px; border-top:1px solid #EEF1EC; white-space:nowrap; }
+  th { background:#F7F9F6; color:var(--muted); }
+  .pill { display:inline-block; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; background:#E7EFE5; color:var(--green); }
+  .hidden { display:none !important; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button { background:#fff; color:var(--ink); border-color:var(--line); }
+  .tabs button[aria-selected="true"] { background:var(--green); color:#fff; border-color:var(--green); }
+  .chip { display:inline-block; min-width:64px; text-align:center; font-size:11px; font-weight:800; padding:4px 8px; border-radius:4px; }
+  .LOW { background:#1F7A3A; color:#fff; } .NORMAL { background:#E9C443; color:#3A2E00; } .HIGH { background:#C62828; color:#fff; }
+  .st-Visited { background:#E7EFE5; color:#14632F; } .st-Scheduled { background:#E8EEF7; color:#1E3A5F; }
+  .st-Due { background:#FFF4CC; color:#5C4700; } .st-Overdue { background:#FDE2E2; color:#9B1C1C; }
+  td.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:12px; }
+  .kpi { border:1px solid var(--line); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:6px; }
+  .kpi b { font-size:12px; color:var(--muted); } .kpi span.v { font-size:26px; font-weight:700; }
+  .months { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
+  .month { border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .month h3 { margin:0; font-size:14px; padding:10px 12px; background:#F7F9F6; border-bottom:1px solid var(--line); }
+  .month ul { list-style:none; margin:0; padding:6px 12px 10px; }
+  .month li { display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; font-size:13px; padding:5px 0; border-top:1px solid #F1F3EF; }
+  .cal { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .cal .dow { background:#F7F9F6; font-size:12px; font-weight:700; color:var(--muted); padding:8px; text-align:center; border-bottom:1px solid var(--line); }
+  .cal .day { min-height:108px; border-right:1px solid #EEF1EC; border-bottom:1px solid #EEF1EC; padding:6px; display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .cal .day:nth-child(7n) { border-right:0; }
+  .cal .day.out { background:#FAFBF9; color:#9CA3AF; }
+  .cal .day.today { box-shadow: inset 0 0 0 2px var(--green); }
+  .cal .num { font-size:12px; font-weight:700; }
+  .cal .ev { font-size:11px; line-height:1.25; padding:3px 6px; border-radius:4px; background:#F3F4F6; color:#374151; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-left:4px solid #9CA3AF; }
+  .cal .ev.LOW { border-left-color:#1F7A3A; background:#E7EFE5; color:#14632F; }
+  .cal .ev.NORMAL { border-left-color:#E9C443; background:#FFF8DC; color:#3A2E00; } .cal .ev.HIGH { border-left-color:#C62828; background:#FDE2E2; color:#7F1D1D; }
+  .cal .more { font-size:11px; color:var(--muted); background:none; border:0; padding:0; min-height:auto; text-align:left; cursor:pointer; font-weight:600; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
+  .planned { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
+  .planned .pc { font-size:12px; padding:5px 8px; border-radius:6px; border:1px solid var(--line); background:#fff; display:inline-flex; gap:6px; align-items:center; }
+  @media (max-width: 700px) { .cal .day { min-height:72px; padding:3px; } .cal .ev { font-size:10px; padding:2px 3px; } .cal .dow { padding:6px 2px; } }
+  .month li:first-child { border-top:0; } .month li .b { flex:1 1 150px; font-weight:600; }
+</style>
+<style>
+  /* ===== SUCH Monitoring theme: full width, Century Gothic, business layout ===== */
+  :root { --green:#0E5A2C; --ink:#14201A; --muted:#56635C; --line:#DDE3DF; --bg:#F2F4F3; --side:#0B2418; --side2:#12341F;
+          --low:#1F7A3A; --normal:#E2B93B; --high:#C62828; }
+  body { font-family: "Century Gothic", CenturyGothic, AppleGothic, "URW Gothic", "URW Gothic L", sans-serif; background:var(--bg); }
+  input, select, button, textarea { font-family:inherit; }
+  #shell { display:flex; min-height:100vh; }
+  #side { width:250px; flex:0 0 250px; background:var(--side); color:#DCE8E0; display:flex; flex-direction:column; gap:22px; padding:24px 16px; position:sticky; top:0; height:100vh; box-sizing:border-box; }
+  .brand { padding:0 8px; }
+  .brand .t { display:block; font-size:22px; font-weight:700; color:#fff; letter-spacing:.3px; line-height:1.15; }
+  .brand .t em { font-style:normal; color:#7FD49B; }
+  .brand .s { display:block; margin-top:6px; font-size:11.5px; color:#9FB8A8; letter-spacing:.4px; line-height:1.5; }
+  .brand .s b { color:#CFE3D6; font-weight:700; }
+  #side nav.tabs { flex-direction:column; gap:4px; }
+  #side nav.tabs button { width:100%; text-align:left; background:transparent; color:#C9DBD0; border:1px solid transparent; font-weight:600; min-height:44px; border-radius:8px; }
+  #side nav.tabs button:hover { background:var(--side2); }
+  #side nav.tabs button[aria-selected="true"] { background:#1F7A45; color:#fff; border-color:#1F7A45; }
+  #side .who { margin-top:auto; font-size:12px; color:#9FB8A8; display:flex; flex-direction:column; gap:8px; padding:0 8px; word-break:break-all; }
+  #side .who button { background:transparent; color:#fff; border-color:#3C5D49; }
+  #mainCol { flex:1 1 auto; min-width:0; }
+  main { max-width:none; margin:0; padding:24px 28px 40px; }
+  section { border-radius:12px; }
+  h2 { font-size:18px; letter-spacing:.2px; }
+  .loginBrand { text-align:center; margin-bottom:8px; }
+  .loginBrand .t { font-size:26px; font-weight:700; color:var(--green); }
+  .loginBrand .s { font-size:12px; color:var(--muted); }
+  /* decision dashboard */
+  .verdict { display:flex; flex-wrap:wrap; gap:18px 28px; align-items:stretch; border-radius:12px; padding:20px 24px; background:#fff; border:1px solid var(--line); border-left:8px solid var(--low); }
+  .verdict.v-HIGH { border-left-color:var(--high); } .verdict.v-NORMAL { border-left-color:var(--normal); }
+  .verdict .head { flex:1 1 380px; min-width:0; }
+  .verdict .tag { display:inline-block; font-size:12px; font-weight:800; letter-spacing:.6px; padding:5px 10px; border-radius:6px; color:#fff; background:var(--low); }
+  .verdict.v-HIGH .tag { background:var(--high); } .verdict.v-NORMAL .tag { background:var(--normal); color:#3A2E00; }
+  .verdict h3 { margin:10px 0 6px; font-size:22px; line-height:1.3; }
+  .verdict p { margin:0; color:var(--muted); font-size:14px; line-height:1.5; }
+  .actions { flex:1 1 360px; margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px; }
+  .actions li { display:flex; gap:10px; align-items:flex-start; font-size:14px; line-height:1.4; padding:10px 12px; background:#F7F9F8; border-radius:8px; }
+  .actions li .n { flex:0 0 22px; height:22px; border-radius:50%; background:var(--ink); color:#fff; font-size:12px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+  .kpiRow { display:grid; grid-template-columns: minmax(220px,1.3fr) repeat(4, minmax(170px,1fr)); gap:14px; }
+  .kt { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:8px; min-width:0; }
+  .kt .l { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.5px; text-transform:uppercase; display:flex; justify-content:space-between; gap:8px; }
+  .kt .v { font-size:34px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
+  .kt.main .v { font-size:44px; }
+  .kt .sub { font-size:12px; color:var(--muted); }
+  .kt.worst { box-shadow: inset 0 0 0 2px var(--high); }
+  .dist { display:flex; gap:2px; height:10px; border-radius:5px; overflow:hidden; background:#EEF1EF; }
+  .dist span { display:block; height:100%; }
+  .dist .LOWb { background:var(--low); } .dist .NORMALb { background:var(--normal); } .dist .HIGHb { background:var(--high); }
+  .legendRow { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
+  .legendRow i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  .twoCol { display:grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); gap:16px; align-items:start; }
+  .rbar { display:inline-block; vertical-align:middle; width:90px; height:8px; background:#EEF1EF; border-radius:4px; overflow:hidden; margin-right:8px; }
+  .rbar span { display:block; height:100%; border-radius:4px; }
+  .act { font-size:12px; font-weight:700; padding:4px 8px; border-radius:6px; white-space:nowrap; }
+  .act.a-HIGH { background:#FDE2E2; color:#8B1A1A; } .act.a-NORMAL { background:#FFF4CC; color:#5C4700; } .act.a-LOW { background:#E7EFE5; color:#14632F; }
+  table { font-size:13px; } th { font-size:12px; letter-spacing:.3px; } th, td { padding:8px 10px; }
+  .twoCol > section, .kpiRow > div { min-width:0; }
+  section { min-width:0; }
+  .st-Missed { background:#FDE2E2; color:#9B1C1C; }
+  .act { white-space:normal; display:inline-block; line-height:1.3; }
+  #side { align-self:flex-start; }
+  .twoCol { grid-template-columns: minmax(0,1.35fr) minmax(0,1fr); }
+  /* editable lists, system access, costs */
+  input.caps { text-transform:uppercase; }
+  .newBox { display:flex; flex-direction:column; gap:6px; margin-top:6px; padding:8px; border:1px dashed #C7D0C5; border-radius:6px; background:#FAFBF9; font-weight:500; }
+  .newBox .note { line-height:1.45; }
+  button.mini { min-height:30px; padding:0 10px; font-size:12px; }
+  table.sysT td, table.sysT th { padding:5px 8px; } table.sysT select { min-height:34px; padding:4px 8px; }
+  table.sysT tr.untrained td { background:#FDE2E2; }
+  .costLine { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; padding:8px 0; border-top:1px solid #EEF1EC; }
+  .costLine:first-child { border-top:0; }
+  .costLine label { flex:1 1 180px; }
+  .costLine .cDel { min-height:44px; padding:0 14px; background:#fff; color:#B71C1C; border-color:#E5B4B4; }
+  @media (max-width: 1200px) { .kpiRow { grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); } .twoCol { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) {
+    #shell { flex-direction:column; } #side { width:auto; flex:none; height:auto; position:static; padding:14px 12px; gap:12px; }
+    #side nav.tabs { flex-direction:row; flex-wrap:wrap; } #side nav.tabs button { width:auto; }
+    #side .who { margin-top:0; flex-direction:row; align-items:center; justify-content:space-between; }
+    main { padding:16px 12px 32px; }
+  }
+</style>
+</head>
+<body>
+<div id="shell">
+<aside id="side" class="hidden">
+  <div class="brand"><span class="t"><em>SUCH</em> Monitoring</span><span class="s"><b>S</b>oftware · <b>U</b>ser · <b>C</b>onnectivity · <b>H</b>ardware</span></div>
+  <nav class="tabs" aria-label="Sections">
+    <button type="button" data-tab="summary" aria-selected="true">Overview &amp; ratings</button>
+    <button type="button" data-tab="calendar" aria-selected="false">Visit calendar</button>
+    <button type="button" data-tab="compliance" aria-selected="false">Schedule compliance</button>
+    <button type="button" data-tab="visits" aria-selected="false">Visited branches</button>
+    <button type="button" data-tab="costs" aria-selected="false">Visit costs</button>
+    <button type="button" data-tab="import" aria-selected="false">Data &amp; import</button>
+  </nav>
+  <div class="who" id="userBox"><span id="userName"></span><button id="signout" class="secondary" type="button">Sign out</button></div>
+</aside>
+<div id="mainCol">
+<main>
+
+<section id="login" style="max-width:420px;width:100%;margin:40px auto 0">
+  <div class="loginBrand"><div class="t">SUCH Monitoring</div><div class="s">Software · User · Connectivity · Hardware</div></div>
+  <h2>Sign in</h2>
+  <form id="loginForm" style="display:flex;flex-direction:column;gap:12px">
+    <label>Email<input id="email" type="email" autocomplete="username" required></label>
+    <label>Password<input id="pass" type="password" autocomplete="current-password" required></label>
+    <button id="signin" type="submit">Sign in</button>
+    <span id="authStatus" class="status"></span>
+  </form>
+  <p class="note">No account? Ask ITSD to create one for you.</p>
+</section>
+<div id="app" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+
+
+<div id="tab-summary" style="display:flex;flex-direction:column;gap:16px">
+  <div class="row" style="margin:0;justify-content:space-between;align-items:flex-end">
+    <div>
+      <h2 style="margin:0;font-size:22px" id="sumTitle">Overview · latest data</h2>
+      <span class="note" id="sumPeriodNote">Showing the latest data.</span>
+    </div>
+    <div class="row" style="margin:0;align-items:flex-end">
+      <label>Year<select id="sumYear"><option value="">Latest</option></select></label>
+      <label>Month<select id="sumMonth" disabled><option value="">—</option></select></label>
+      <button id="sumRefresh" class="secondary" type="button">Refresh</button>
+      <span id="sumUpdated" class="note"></span>
+    </div>
+  </div>
+
+  <div id="verdict" class="verdict"></div>
+  <div id="kpiRow" class="kpiRow"></div>
+  <div class="legendRow"><span><i style="background:var(--low)"></i>LOW &lt; 1.50</span><span><i style="background:var(--normal)"></i>NORMAL 1.50–2.49</span><span><i style="background:var(--high)"></i>HIGH ≥ 2.50</span><span>Bars show how many offices fall in each band. Lower score = lower risk.</span></div>
+
+  <div class="twoCol">
+    <section>
+      <h2>Needs attention</h2>
+      <p class="note" style="margin:-6px 0 8px">Highest-risk offices first, with the recommended action.</p>
+      <div id="attn" class="box" style="margin:0"></div>
+    </section>
+    <section>
+      <h2>Ratings by group</h2>
+      <div id="kpis" class="box" style="margin:0"></div>
+    </section>
+  </div>
+
+  <section>
+    <div class="row" style="margin:0 0 8px;justify-content:space-between">
+      <h2 style="margin:0">All offices</h2>
+      <label style="flex-direction:row;align-items:center;gap:8px">Find office<input id="sumSearch" placeholder="e.g. BACLARAN"></label>
+    </div>
+    <div id="sumTable" class="box" style="margin:0"></div>
+    <p class="note">Rating = average of S, U, C, H. All HO units are recorded as one HEAD OFFICE and all SO units as one SATELLITE OFFICE. Updates as soon as data is submitted or imported.</p>
+  </section>
+</div>
+
+<div id="tab-calendar" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+<div class="tabs" id="calView" role="group" aria-label="Calendar view">
+  <button type="button" data-view="month" aria-selected="true">Month calendar</button>
+  <button type="button" data-view="list" aria-selected="false">Quarter list</button>
+</div>
+<section id="calMonth">
+  <div class="row" style="margin:0 0 12px;justify-content:space-between">
+    <div class="row" style="margin:0">
+      <button type="button" class="secondary" id="calPrev" aria-label="Previous month">‹</button>
+      <h2 id="calMonthTitle" style="margin:0;min-width:170px;text-align:center">Month</h2>
+      <button type="button" class="secondary" id="calNext" aria-label="Next month">›</button>
+      <button type="button" class="secondary" id="calToday">Today</button>
+    </div>
+    <div class="row" style="margin:0;gap:12px;font-size:12px">
+      <span><span class="dot" style="background:#1F7A3A"></span>Visited · LOW</span>
+      <span><span class="dot" style="background:#E9C443"></span>Visited · NORMAL</span>
+      <span><span class="dot" style="background:#C62828"></span>Visited · HIGH</span>
+    </div>
+  </div>
+  <div id="calPlanned"></div>
+  <div id="calGrid" class="cal"></div>
+  <p class="note">Days show the actual visit dates. Visits planned for the month (no fixed day yet) are listed above the calendar; LOW branches can be visited any time in their half-year.</p>
+</section>
+<div id="calListWrap" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+<section>
+  <h2 id="calTitle1">This quarter</h2>
+  <div id="calOverdue"></div>
+  <div id="calQ1" class="months"></div>
+</section>
+<section>
+  <h2 id="calTitle2">Next quarter</h2>
+  <div id="calQ2" class="months"></div>
+  <p class="note">NORMAL = Quarterly: one visit every quarter. LOW = Semi-Annual: one visit per half-year — H1 (Q1 or Q2) and H2 (Q3 or Q4); visited in Q1 means the next visit is any time in Q3 or Q4, and it is only late when the half-year ends. HIGH = Monthly. A branch turns Visited as soon as its visit is submitted or imported.</p>
+</section>
+</div>
+</div>
+
+<div id="tab-compliance" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+<section>
+  <div class="row" style="margin:0 0 12px;justify-content:space-between">
+    <h2 style="margin:0">Schedule compliance</h2>
+    <div class="row" style="margin:0">
+      <label style="flex-direction:row;align-items:center;gap:8px">Quarter <select id="cmpQuarter" style="font:inherit;min-height:44px;padding:0 10px;border:1px solid #C7D0C5;border-radius:6px"></select></label>
+      <button id="cmpLockNext" class="secondary" type="button">Lock next quarter's schedule</button>
+    </div>
+  </div>
+  <div id="cmpKpis" class="kpis"></div>
+  <div id="cmpLists" class="months"></div>
+  <p class="note">Scheduled = the branch is on the locked schedule for that quarter. The first visit of a branch's period counts as its scheduled visit; extra visits in the same period, or visits to branches not on the schedule, are "Visited – not scheduled". A locked schedule can't be changed; locking again only adds branches that became due.</p>
+  <p id="cmpStatus" class="status"></p>
+</section>
+</div>
+
+<div id="tab-visits" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+<section>
+  <h2>Submit a visit record</h2>
+  <p class="note">Every field is a drop-down, so only valid values can be saved. The Risk Rating and visit frequency are taken automatically from the branch's most recent rating — no need to know them.</p>
+  <form id="visitForm" class="grid" style="align-items:end">
+    <label>Branch<select id="vBranch" required><option value="">Choose…</option></select></label>
+    <label>Year<select id="vYear" required></select></label>
+    <label>Q<select id="vQ" required><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
+    <label>Rating · frequency (automatic)<input id="vRating" readonly tabindex="-1" style="background:#F7F9F6" value="Choose a branch"></label>
+    <label>Visit (automatic)<input id="vPeriod" readonly tabindex="-1" style="background:#F7F9F6"></label>
+    <label>Visited / Not Visited<select id="vVisited" required><option>Visited</option><option>Not Visited</option></select></label>
+    <label>Actual Date of Visit<input id="vDate" type="date"></label>
+    <label>Scheduled / Not Scheduled<select id="vSched" required><option>Scheduled</option><option>Not Scheduled</option></select></label>
+    <label>IT Technician<select id="vTech" required><option value="">Choose…</option></select></label>
+    <fieldset id="vCostBox" style="grid-column:1/-1;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0">
+      <legend class="note" style="padding:0 6px">Costs for this visit (optional) · IT on the Go budget, tools, machines installed, transportation…</legend>
+      <div id="vCosts"></div>
+      <div class="row" style="margin:6px 0 0"><button type="button" class="secondary" id="vAddCost">+ Add cost line</button><span id="vCostTotal" class="note"></span></div>
+    </fieldset>
+    <button type="submit" id="vSubmit">Submit record</button>
+  </form>
+  <p id="vStatus" class="status"></p>
+</section>
+<section>
+  <h2>Upload visit history (Excel)</h2>
+  <p class="note">Use the visit template (Branch · Year · Q · Actual Date of Visit · Visited/Not Visited · Scheduled/Not Scheduled · IT Technician) or your Complete Master Schedule sheet. Risk Rating and frequency are filled in from each branch's most recent rating when the sheet doesn't have them. Every value is checked against the same lists as the drop-downs; rows with a wrong value are rejected and listed with their row number. "Scheduled" rows also become that quarter's schedule.
+  Costs: add a sheet named <b>Costs</b> with Branch · Date · Category · Description · Qty · Unit cost (or Amount).</p>
+  <input id="vFile" type="file" accept=".xlsx,.xls">
+  <p id="vFileStatus" class="status"></p>
+  <div class="row"><button id="vUpload" type="button" disabled>Submit visits (append only)</button></div>
+  <p id="vResult" class="status"></p>
+  <div id="vMessages" class="box"></div>
+</section>
+<section>
+  <div class="row" style="margin:0 0 12px;justify-content:space-between">
+    <h2 style="margin:0">Visit history</h2>
+  </div>
+  <div class="row" style="margin:0 0 12px">
+    <label>Year<select id="vfYear"><option value="">All years</option></select></label>
+    <label>Quarter<select id="vfQ"><option value="">All quarters</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
+    <label>Sort by<select id="vfSort"><option value="branch">Branch (A–Z)</option><option value="date">Visit date (newest first)</option><option value="quarter">Quarter, then branch</option></select></label>
+    <label>Find office<input id="vSearch" placeholder="e.g. BAMBANG"></label>
+  </div>
+  <p id="vCount" class="note" style="margin:0 0 8px"></p>
+  <div id="vLog" class="box"></div>
+  <p class="note">Visits from this page and from imported device/user data both count for the calendar and compliance. Entries can't be edited or deleted; a visit already logged for the same office and date is skipped.</p>
+</section>
+</div>
+
+<div id="tab-costs" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+<section>
+  <div class="row" style="margin:0 0 12px;justify-content:space-between">
+    <h2 style="margin:0">Visit costs</h2>
+    <button id="cExport" class="secondary" type="button">Export to Excel</button>
+  </div>
+  <div class="row" style="margin:0 0 12px">
+    <label>Year<select id="cYear"><option value="">All years</option></select></label>
+    <label>Quarter<select id="cQ"><option value="">All quarters</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
+    <label>Category<select id="cCat"><option value="">All categories</option></select></label>
+    <label>Find branch<input id="cBranch" placeholder="e.g. BACLARAN"></label>
+  </div>
+  <div id="cKpis" class="kpis"></div>
+  <div class="twoCol">
+    <div><h3 style="margin:0 0 6px;font-size:15px">By branch</h3><div id="cByBranch" class="box" style="margin:0"></div></div>
+    <div><h3 style="margin:0 0 6px;font-size:15px">By category</h3><div id="cByCat" class="box" style="margin:0"></div></div>
+  </div>
+</section>
+<section>
+  <h2>Cost lines</h2>
+  <p id="cCount" class="note" style="margin:0 0 8px"></p>
+  <div id="cList" class="box" style="margin:0"></div>
+  <p class="note">Costs are entered with the visit (Visited branches › Submit a visit record) or uploaded in a "Costs" sheet with the visit history. Only admins can edit or remove a cost line.</p>
+</section>
+</div>
+
+<div id="tab-import" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+<section>
+  <h2>Submit a data record</h2>
+  <p class="note">Add one device or user at a time. Pick the parameter, branch and serial (or employee); if it was recorded before, its last details are filled in — change only what is different and submit. The <b>Date of inclusion</b> is the date this record counts for (ratings are filtered by month and year). The score is computed by the system.</p>
+  <form id="dForm" style="display:flex;flex-direction:column;gap:12px">
+    <div class="grid" style="align-items:end">
+      <label>Parameter<select id="dCat" required><option value="H">H · Hardware</option><option value="S">S · Software</option><option value="C">C · Connectivity</option><option value="U">U · User</option></select></label>
+      <label>Branch<select id="dBranch" required><option value="">Choose…</option></select></label>
+      <label>Date of inclusion<input id="dDate" type="date" required></label>
+      <label id="dKeyLabel">Serial<input id="dKey" list="dKeyList" required autocomplete="off" placeholder="Type or pick"></label>
+    </div>
+    <datalist id="dKeyList"></datalist>
+    <p id="dPrefill" class="note" style="margin:0"></p>
+    <div id="dFields" class="grid" style="align-items:end"></div>
+    <div class="row" style="margin:0">
+      <span id="dScore" class="pill" style="background:#F3F4F6;color:#374151">Score: —</span>
+      <button type="submit" id="dSubmit">Submit data record</button>
+    </div>
+    <p id="dStatus" class="status" style="margin:0"></p>
+  </form>
+</section>
+
+<section id="pick">
+  <h2>1 · Choose the PM workbook or a single sheet</h2>
+  <p class="note">Import the whole workbook or just one sheet (S, U, C or H). Each sheet only needs <b>DATE</b>, <b>Branch</b>, <b>SERIAL</b> (User sheet: <b>EMPLOYEE NAME</b> or <b>EMPLOYEE NO</b>) and the details used for its score:
+  Hardware → Date of Acquisition · Software → OS or Rating · Connectivity → IS, AV, FW (or Total) · User → POSITION plus one column per system: <b>Y</b> = has access and was trained, <b>N</b> = has access, <b>no training</b>, blank = no access (old sheets with COUNT still work).
+  A new OS that is not on the list is added automatically as 1 · LOW and sent to admin for review.
+  The Score is computed by the system. If a detail is left blank, it is copied from that device's or user's last record, so a re-visit only needs DATE, Branch and SERIAL. Branch ratings update right after the import.</p>
+  <input id="file" type="file" accept=".xlsx,.xls">
+  <p id="fileStatus" class="status"></p>
+  <div id="preview" class="box"></div>
+</section>
+
+<section>
+  <h2>2 · Append to the ledger</h2>
+  <div class="row">
+    <button id="import" disabled>Import (append only)</button>
+    <span class="pill">No delete · no overwrite · duplicates skipped</span>
+  </div>
+  <p id="result" class="status"></p>
+  <div id="messages" class="box"></div>
+</section>
+
+<section>
+  <div class="row" style="margin:0 0 12px;justify-content:space-between">
+    <h2 style="margin:0">Data history</h2>
+  </div>
+  <div class="row" style="margin:0 0 12px">
+    <label>Year<select id="hYear"><option value="">All years</option></select></label>
+    <label>Month<select id="hMonth"><option value="">All months</option></select></label>
+    <label>Parameter<select id="hCat"><option value="">All</option><option value="S">S · Software</option><option value="U">U · User</option><option value="C">C · Connectivity</option><option value="H">H · Hardware</option></select></label>
+    <label>Sort by<select id="hSort"><option value="date">Date of inclusion (newest)</option><option value="branch">Branch (A–Z)</option></select></label>
+    <label>Find branch / serial<input id="hSearch" placeholder="e.g. BACLARAN"></label>
+  </div>
+  <p id="hCount" class="note" style="margin:0 0 8px"></p>
+  <div id="hList" class="box"></div>
+</section>
+
+<section>
+  <h2>Import history</h2>
+  <button id="refresh" class="secondary">Refresh</button>
+  <div id="history" class="box"></div>
+</section>
+
+</div>
+</div>
+</main>
+</div>
+</div>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+  // ===== ITSD: fill these two values once (Supabase › Project Settings › API) =====
+  const SUPABASE_URL = 'https://hbrhhhgikxkxhjdsqtgm.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhicmhoaGdpa3hreGhqZHNxdGdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0NjUxMzEsImV4cCI6MjEwNzA0MTEzMX0.uizFpNOu2qqbZ3gfoLvBES4Cj_sEKCwNzFCKGshRQx0';
+  // ===============================================================================
+  let rows = [], fileName = '', signedIn = false;
+
+  if (!window.supabase || !window.XLSX) {
+    document.getElementById('authStatus').innerHTML = '<span class="err">Could not load the libraries from cdn.jsdelivr.net. Check the internet connection or ask for that site to be allowed.</span>';
+    return;
+  }
+
+  if (SUPABASE_URL.indexOf('YOUR-') >= 0 || SUPABASE_KEY.indexOf('YOUR-') >= 0) {
+    $('authStatus').innerHTML = '<span class="err">This page is not set up yet. Please contact ITSD.</span>';
+    $('signin').disabled = true;
+    return;
+  }
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const client = () => sb;
+  $('email').value = store.get('pm_email');
+
+  function setSignedIn(email) {
+    signedIn = !!email;
+    $('login').classList.toggle('hidden', signedIn);
+    $('app').classList.toggle('hidden', !signedIn);
+    $('side').classList.toggle('hidden', !signedIn);
+    $('userName').textContent = email ? 'Signed in as ' + email : '';
+    document.title = 'SUCH Monitoring';
+    updateImportButton();
+    if (signedIn) showTab('summary');
+  }
+
+  function updateImportButton() { $('import').disabled = !(rows.length && signedIn); }
+
+  $('loginForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    store.set('pm_email', $('email').value.trim());
+    $('authStatus').textContent = 'Signing in…'; $('signin').disabled = true;
+    const { data, error } = await sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('pass').value });
+    $('pass').value = ''; $('signin').disabled = false;
+    if (error) { $('authStatus').innerHTML = '<span class="err">Sign-in failed: ' + esc(error.message) + '</span>'; return; }
+    $('authStatus').textContent = '';
+    setSignedIn(data.user.email);
+  };
+
+  $('signout').onclick = async () => { await sb.auth.signOut(); rows = []; setSignedIn(''); };
+
+  // ---- Reading the ITSD workbook (sheets Hardware, Connectivity, User, Software) ----
+  const SHEETS = { HARDWARE: 'H', CONNECTIVITY: 'C', USER: 'U', SOFTWARE: 'S' };
+  const MONTHS = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12 };
+  const pad = (n) => String(n).padStart(2, '0');
+  const ymd = (y, m, d) => (y > 1900 && m >= 1 && m <= 12 && d >= 1 && d <= 31) ? y + '-' + pad(m) + '-' + pad(d) : null;
+  function toDate(v) {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') { const c = XLSX.SSF.parse_date_code(v); return c ? ymd(c.y, c.m, c.d) : null; }
+    const t = String(v).trim(); let m;
+    if ((m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return ymd(+m[1], +m[2], +m[3]);
+    if ((m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) return ymd(+m[3], +m[1], +m[2]);           // M/D/YYYY
+    if ((m = t.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/))) {                                // November 26, 2025
+      const mo = MONTHS[m[1].toLowerCase().slice(0, m[1].toLowerCase().startsWith('sept') ? 4 : 3)];
+      return mo ? ymd(+m[3], mo, +m[2]) : null;
+    }
+    return null;
+  }
+  function cellText(v) {
+    if (v == null) return '';
+    if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(v);
+    return String(v).trim();
+  }
+  function findCol(headers, tests) {
+    for (const t of tests) { const h = headers.find(x => t.test(x.trim())); if (h) return h; }
+    return null;
+  }
+  // Reads every sheet that has DATE + Branch + SERIAL (or EMPLOYEE NAME/NO). The parameter (S/U/C/H) comes from the
+  // sheet name, or the user picks it. Only the columns needed are required; Score is computed by the system when blank.
+  const PNAMES = { H: 'Hardware', C: 'Connectivity', U: 'User', S: 'Software' };
+  let sheetInfo = [];
+  function guessCat(name) {
+    const n = name.trim().toUpperCase();
+    if (SHEETS[n]) return SHEETS[n];
+    if (/HARDWARE|^H$/.test(n)) return 'H'; if (/CONNECT|^C$/.test(n)) return 'C';
+    if (/USER|^U$/.test(n)) return 'U'; if (/SOFTWARE|^S$/.test(n)) return 'S';
+    return '';
+  }
+  function readWorkbook(wb) {
+    const out = [], summary = [];
+    wb.SheetNames.forEach(name => {
+      const ws = wb.Sheets[name];
+      const data = XLSX.utils.sheet_to_json(ws, { raw: true, defval: '' });
+      if (!data.length) return;
+      const headers = Object.keys(data[0]);
+      const col = {
+        date:   findCol(headers, [/^date$/i, /^visit\s*date$/i, /^date\s*of\s*visit$/i]),
+        branch: findCol(headers, [/^branch$/i]),
+        serial: findCol(headers, [/^serial/i]),
+        user:   findCol(headers, [/^user$/i, /^employee\s*name/i]),
+        empno:  findCol(headers, [/^employee\s*(no|#|id|number)/i, /^emp(loyee)?\s*no/i, /^employ/i]),
+        score:  findCol(headers, [/^score$/i]),
+        visited: findCol(headers, [/^visited\s*\/?\s*not\s*visited/i])
+      };
+      if (col.visited || !col.date || !col.branch || !(col.serial || col.user || col.empno)) return;   // not a PM data sheet
+      const cat = guessCat(name);
+      const rowsOf = [];
+      data.forEach((r, i) => {
+        if (!Object.values(r).some(v => String(v).trim() !== '')) return;
+        const clean = {};
+        headers.forEach(h => { const v = r[h]; clean[h.trim()] = /date/i.test(h) ? (toDate(v) || cellText(v)) : cellText(v); });
+        rowsOf.push({
+          sheet: name, row: i + 2,
+          visit_date: toDate(r[col.date]),
+          branch: cellText(r[col.branch]),
+          item_key_u: cellText(col.empno ? r[col.empno] : '') || cellText(col.user ? r[col.user] : ''),
+          item_key_d: cellText(col.serial ? r[col.serial] : ''),
+          user_name: col.user ? cellText(r[col.user]) : '',
+          score: col.score ? cellText(r[col.score]) : '',
+          data: clean
+        });
+      });
+      summary.push({ name, cat, count: rowsOf.length, hasScore: !!col.score, hasSerial: !!col.serial, hasEmp: !!(col.user || col.empno) });
+      out.push(...rowsOf);
+    });
+    return { rows: out, summary };
+  }
+  function buildRows(all) {
+    const map = {}; sheetInfo.forEach(s => { map[s.name] = s.cat; });
+    return all.filter(r => map[r.sheet]).map(r => {
+      const cat = map[r.sheet];
+      return { sheet: r.sheet, row: r.row, category: cat, visit_date: r.visit_date, branch: r.branch,
+        item_key: cat === 'U' ? r.item_key_u : (r.item_key_d || r.item_key_u), user_name: r.user_name, score: r.score, data: r.data };
+    });
+  }
+  let allRows = [];
+  function renderSheetPreview() {
+    rows = buildRows(allRows);
+    $('preview').innerHTML = '<table><tr><th>Sheet</th><th>Import as</th><th>Rows</th><th>Score</th></tr>' +
+      sheetInfo.map((s, i) => '<tr><td>' + esc(s.name) + '</td><td><select data-sheet="' + i + '" class="sheetCat" style="min-height:36px;padding:4px 8px">' +
+        '<option value="">Skip this sheet</option>' + ['S', 'U', 'C', 'H'].map(c => '<option value="' + c + '"' + (s.cat === c ? ' selected' : '') + '>' + c + ' · ' + PNAMES[c] + '</option>').join('') +
+        '</select></td><td class="num">' + s.count + '</td><td>' + (s.hasScore ? 'From the sheet (blank cells are computed)' : '<span class="ok">Computed by the system</span>') + '</td></tr>').join('') + '</table>';
+    document.querySelectorAll('.sheetCat').forEach(sel => sel.onchange = () => { sheetInfo[+sel.dataset.sheet].cat = sel.value; rows = buildRows(allRows); $('fileStatus').innerHTML = '<span class="ok">' + rows.length + ' rows will be imported.</span>'; updateImportButton(); });
+    $('fileStatus').innerHTML = '<span class="ok">' + rows.length + ' rows will be imported</span> from ' + esc(fileName) + '.';
+    updateImportButton();
+  }
+
+  $('file').onchange = async (ev) => {
+    rows = []; allRows = []; sheetInfo = []; fileName = ''; $('preview').innerHTML = ''; $('result').textContent = ''; $('messages').innerHTML = '';
+    const f = ev.target.files[0]; if (!f) { updateImportButton(); return; }
+    try {
+      const wb = XLSX.read(await f.arrayBuffer(), { cellDates: false });
+      const { rows: rr, summary } = readWorkbook(wb);
+      if (!summary.length) {
+        $('fileStatus').innerHTML = '<span class="err">No sheet with DATE, Branch and SERIAL (or EMPLOYEE NAME) columns was found in this file.</span>';
+        updateImportButton(); return;
+      }
+      allRows = rr; sheetInfo = summary; fileName = f.name;
+      renderSheetPreview();
+    } catch (e) {
+      $('fileStatus').innerHTML = '<span class="err">Could not read the file: ' + esc(e.message) + '</span>';
+    }
+    updateImportButton();
+  };
+
+  $('import').onclick = async () => {
+    if (!rows.length) return;
+    $('import').disabled = true; $('messages').innerHTML = '';
+    const newOS = await prepareImportRows();
+    const { data: batch, error: e1 } = await sb.rpc('start_import', { p_source_file: fileName });
+    if (e1) { $('result').innerHTML = '<span class="err">Import failed: ' + esc(e1.message) + '</span>'; updateImportButton(); return; }
+    let app = 0, skip = 0, rej = 0, comp = 0, repl = 0, msgs = [];
+    for (let i = 0; i < rows.length; i += 500) {
+      $('result').textContent = 'Importing… ' + Math.min(i + 500, rows.length) + ' of ' + rows.length;
+      const { data, error } = await sb.rpc('import_entries', { p_batch_id: batch, p_rows: rows.slice(i, i + 500) });
+      if (error) { $('result').innerHTML = '<span class="err">Import stopped at row ' + (i + 1) + ': ' + esc(error.message) + '. Rows before this point were saved; re-import the same file and they will be skipped.</span>'; updateImportButton(); loadHistory(); return; }
+      app += data.appended; skip += data.skipped; rej += data.rejected; comp += (data.computed || 0); repl += (data.replicated || 0); msgs = msgs.concat(data.messages);
+    }
+    $('result').innerHTML = 'Batch <b>' + batch + '</b>: read ' + rows.length +
+      ' · <span class="ok">appended ' + app + '</span>' +
+      ' · <span class="warn">skipped ' + skip + ' (already in ledger)</span>' +
+      ' · <span class="err">rejected ' + rej + '</span>' +
+      '<br><span class="note">Scores computed by the system: ' + comp + ' · last known score reused: ' + repl + '</span>' +
+      (newOS.length ? '<br><span class="warn">New OS added as 1 · LOW and sent to admin for review: ' + newOS.map(esc).join(', ') + '</span>' : '');
+    const shown = msgs.filter(m => m.status === 'rejected').concat(msgs.filter(m => m.status !== 'rejected')).slice(0, 300);
+    if (shown.length) {
+      $('messages').innerHTML = '<table><tr><th>Where</th><th>Status</th><th>Reason</th></tr>' +
+        shown.map(m => '<tr><td>' + esc(m.where) + '</td><td>' + esc(m.status) + '</td><td>' + esc(m.reason) + '</td></tr>').join('') + '</table>' +
+        (msgs.length > shown.length ? '<p class="note">Showing first ' + shown.length + ' of ' + msgs.length + ' messages.</p>' : '');
+    }
+    rows = []; $('file').value = ''; $('preview').innerHTML = ''; $('fileStatus').textContent = 'Done. Choose another file to import more.';
+    updateImportButton(); loadHistory(); loadSummary();
+    $('fileStatus').innerHTML = 'Done. Ratings and calendar are updated — see the <b>Ratings summary</b> and <b>Visit calendar</b> tabs.';
+  };
+
+  // ---------- Tabs ----------
+  document.querySelectorAll('nav.tabs button').forEach(btn => btn.onclick = () => showTab(btn.dataset.tab));
+  function showTab(t) {
+    document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+    ['summary', 'calendar', 'compliance', 'visits', 'costs', 'import'].forEach(x => $('tab-' + x).classList.toggle('hidden', x !== t));
+    if (t === 'summary') loadSummary(); if (t === 'calendar') { if (calView === 'month') loadMonth(); else loadCalendar(); } if (t === 'compliance') loadCompliance(); if (t === 'visits') { loadLists(); loadVisits(); } if (t === 'costs') loadCosts(); if (t === 'import') { loadHistory(); loadDataForm(); loadDataHistory(); }
+  }
+  const bandOf = (v) => v == null ? '' : (v < 1.5 ? 'LOW' : v < 2.5 ? 'NORMAL' : 'HIGH');
+  const f2 = (v) => v == null ? '—' : Number(v).toFixed(2);
+  const chip = (b) => b ? '<span class="chip ' + b + '">' + b + '</span>' : '';
+
+  // ---------- Ratings summary (the Summary sheet) ----------
+  let summaryRows = [];
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  (function fillSumYears() {
+    const y = new Date().getFullYear();
+    $('sumYear').innerHTML = '<option value="">Latest</option>' + [y, y - 1, y - 2, y - 3].map(v => '<option>' + v + '</option>').join('');
+  })();
+  $('sumYear').onchange = () => {
+    const y = $('sumYear').value; $('sumMonth').disabled = !y;
+    const now = new Date(), maxM = (+y === now.getFullYear()) ? now.getMonth() : 11;
+    $('sumMonth').innerHTML = y ? MONTH_NAMES.slice(0, maxM + 1).map((m, i) => '<option value="' + (i + 1) + '"' + (i === maxM ? ' selected' : '') + '>' + m + '</option>').join('') : '<option value="">—</option>';
+    loadSummary();
+  };
+  $('sumMonth').onchange = loadSummary;
+  async function loadSummary() {
+    const py = $('sumYear').value, pm = $('sumMonth').value;
+    if (py && pm) {
+      const end = new Date(+py, +pm, 0), endIso = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0');
+      const { data, error } = await sb.rpc('pm_summary_asof', { p_date: endIso });
+      if (error) { $('sumTable').innerHTML = '<span class="err">' + esc(error.message) + '</span>'; return; }
+      $('sumTitle').textContent = 'Overview · ' + MONTH_NAMES[+pm - 1] + ' ' + py; curCompliance = null;
+      $('sumPeriodNote').textContent = 'Ratings as they stood on ' + endIso + ' (each device/user\'s latest record up to that date).';
+      summaryRows = (data || []).map(r => Object.assign({ frequency: '', next: null }, r)).sort((x, y) => (y.rating || 0) - (x.rating || 0));
+      renderSummary(); $('sumUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString(); return;
+    }
+    $('sumTitle').textContent = 'Overview · latest data';
+    $('sumPeriodNote').textContent = 'Showing the latest data.';
+    const qd = new Date(), qStartIso = qd.getFullYear() + '-' + String(Math.floor(qd.getMonth() / 3) * 3 + 1).padStart(2, '0') + '-01';
+    sb.from('v_schedule_compliance_summary').select('*').eq('quarter_start', qStartIso).limit(1).then(({ data }) => { curCompliance = (data && data[0]) || null; renderSummary(); });
+    const [sum, sch] = await Promise.all([
+      sb.from('v_branch_summary').select('*').order('rating', { ascending: false }).limit(5000),
+      sb.from('v_visit_schedule').select('branch,due_month,status,period,frequency,due_window').neq('status', 'Visited').order('due_month').limit(10000)
+    ]);
+    const error = sum.error || sch.error;
+    if (error) { $('sumTable').innerHTML = '<span class="err">' + esc(error.message) + '</span>'; return; }
+    const next = {}; sch.data.filter(r => r.status !== 'Visited').sort((x, y) => x.due_month < y.due_month ? -1 : 1).forEach(r => { if (!next[r.branch]) next[r.branch] = r; });
+    summaryRows = sum.data.map(r => Object.assign({}, r, { next: next[r.branch] })).sort((x, y) => (y.rating || 0) - (x.rating || 0)); renderSummary();
+    $('sumUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  }
+  function avg(list) { const v = list.filter(x => x != null).map(Number); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; }
+  const GROUPS = [
+    ['Bankwide', () => true],
+    ['Branches', (r) => (r.office_type || 'Branch') === 'Branch'],
+    ['Head Office', (r) => r.office_type === 'Head Office'],
+    ['Satellite Office', (r) => r.office_type === 'Satellite Office']
+  ];
+  const CF = ['s', 'u', 'c', 'h'];
+  function groupStats(rows) {
+    const c = CF.map(f => avg(rows.map(r => r[f])));
+    const rating = avg(c), cnt = { LOW: 0, NORMAL: 0, HIGH: 0 };
+    rows.forEach(r => { if (cnt[r.re] != null) cnt[r.re]++; });
+    return { c, rating, cnt, n: rows.length };
+  }
+  let curCompliance = null;
+  const PN = { s: 'Software', u: 'User', c: 'Connectivity', h: 'Hardware' };
+  function distBar(rows, f) {
+    const cnt = { LOW: 0, NORMAL: 0, HIGH: 0 };
+    rows.forEach(r => { const v = f ? r[f] : r.rating; const b = bandOf(v == null ? null : Number(v)); if (b) cnt[b]++; });
+    const tot = cnt.LOW + cnt.NORMAL + cnt.HIGH || 1;
+    return { cnt, html: '<div class="dist" role="img" aria-label="Low ' + cnt.LOW + ', Normal ' + cnt.NORMAL + ', High ' + cnt.HIGH + '">' +
+      ['LOW', 'NORMAL', 'HIGH'].filter(k => cnt[k]).map(k => '<span class="' + k + 'b" style="width:' + (cnt[k] / tot * 100) + '%" title="' + k + ': ' + cnt[k] + ' office' + (cnt[k] === 1 ? '' : 's') + '"></span>').join('') + '</div>' +
+      '<div class="sub">Low ' + cnt.LOW + ' · Normal ' + cnt.NORMAL + ' · High ' + cnt.HIGH + '</div>' };
+  }
+  function worstParam(r) { let w = null; CF.forEach(f => { if (r[f] != null && (w == null || +r[f] > +r[w])) w = f; }); return w; }
+  function actionFor(r) {
+    const st = r.next && r.next.status, wp = worstParam(r);
+    if (r.re === 'HIGH') return ['HIGH', 'Visit & remediate now' + (wp ? ' — ' + PN[wp] : '')];
+    if (st === 'Missed') return ['HIGH', 'Visit missed — reschedule'];
+    if (wp && +r[wp] >= 2.5) return ['NORMAL', 'Fix ' + PN[wp] + ' (' + f2(r[wp]) + ')'];
+    if (st === 'Due') return ['NORMAL', 'Visit due this period'];
+    if (r.re === 'NORMAL') return ['NORMAL', 'Monitor — quarterly visit'];
+    return ['LOW', 'No action — on track'];
+  }
+  function renderSummary() {
+    if (!summaryRows.length) {
+      $('verdict').className = 'verdict'; $('verdict').innerHTML = '<div class="head"><span class="tag">NO DATA</span><h3>No ratings yet</h3><p>Import the PM workbook or submit data records to see the overview.</p></div>';
+      $('kpiRow').innerHTML = ''; $('attn').innerHTML = ''; $('kpis').innerHTML = ''; $('sumTable').innerHTML = ''; return;
+    }
+    const all = summaryRows, st = groupStats(all), overall = st.rating, ob = bandOf(overall);
+    const high = all.filter(r => r.re === 'HIGH').sort((a, b) => b.rating - a.rating);
+    const missed = all.filter(r => r.next && r.next.status === 'Missed'), due = all.filter(r => r.next && r.next.status === 'Due');
+    const wIdx = st.c.reduce((m, v, i) => (v != null && (m < 0 || v > st.c[m])) ? i : m, -1), wf = CF[wIdx];
+    const wCount = wf ? all.filter(r => r[wf] != null && +r[wf] >= 1.5).length : 0;
+    const comp = curCompliance && curCompliance.compliance_pct != null ? +curCompliance.compliance_pct : null;
+    // Verdict
+    const level = high.length ? 'HIGH' : (missed.length || ob === 'NORMAL' || (comp != null && comp < 90)) ? 'NORMAL' : 'LOW';
+    const tag = { HIGH: 'ACTION REQUIRED', NORMAL: 'ATTENTION', LOW: 'ON TRACK' }[level];
+    const headline = level === 'HIGH' ? high.length + ' office' + (high.length === 1 ? ' is' : 's are') + ' HIGH risk — prioritise ' + (high.length === 1 ? 'it' : 'them') + ' now'
+      : level === 'NORMAL' ? 'Bankwide risk is ' + ob + ' — keep visits on schedule and fix ' + (wf ? PN[wf] : 'weak areas')
+      : 'All offices are LOW risk — maintain the current visit schedule';
+    const acts = [];
+    if (high.length) acts.push('Visit and remediate: <b>' + high.slice(0, 4).map(r => esc(r.branch)).join(', ') + '</b>' + (high.length > 4 ? ' and ' + (high.length - 4) + ' more' : '') + '.');
+    if (wf) acts.push('Weakest area bankwide is <b>' + PN[wf] + ' (' + f2(st.c[wIdx]) + ')</b> — ' + wCount + ' office' + (wCount === 1 ? '' : 's') + ' at NORMAL or worse. Focus the next PM checklist there.');
+    if (missed.length) acts.push('<b>' + missed.length + '</b> scheduled visit' + (missed.length === 1 ? ' was' : 's were') + ' missed — reschedule: ' + missed.slice(0, 4).map(r => esc(r.branch)).join(', ') + (missed.length > 4 ? '…' : '') + '.');
+    if (due.length) acts.push('<b>' + due.length + '</b> visit' + (due.length === 1 ? ' is' : 's are') + ' due in the current period.');
+    if (comp != null) acts.push('Schedule compliance this quarter: <b>' + comp + '%</b>' + (comp < 90 ? ' — below the 90% target.' : ' — on target.'));
+    if (!acts.length) acts.push('No action needed.');
+    $('verdict').className = 'verdict v-' + level;
+    $('verdict').innerHTML = '<div class="head"><span class="tag">' + tag + '</span><h3>' + esc(headline) + '</h3><p>Bankwide rating <b>' + f2(overall) + ' · ' + ob + '</b> across ' + all.length + ' offices' +
+      ($('sumYear').value ? '' : ' (latest data)') + '. Lower is better.</p></div><ol class="actions">' + acts.map((t, i) => '<li><span class="n">' + (i + 1) + '</span><span>' + t + '</span></li>').join('') + '</ol>';
+    // KPI tiles
+    const od = distBar(all, null);
+    $('kpiRow').innerHTML = '<div class="kt main"><span class="l">Bankwide rating <span>' + chip(ob) + '</span></span><span class="v">' + f2(overall) + '</span>' + od.html + '</div>' +
+      CF.map((f, i) => { const d = distBar(all, f), v = st.c[i];
+        return '<div class="kt' + (i === wIdx ? ' worst' : '') + '"><span class="l">' + f.toUpperCase() + ' · ' + PN[f] + (i === wIdx ? '<span style="color:var(--high)">WEAKEST</span>' : '') + '</span><span class="v">' + f2(v) + '</span>' +
+          (v == null ? '' : '<span>' + chip(bandOf(v)) + '</span>') + d.html + '</div>'; }).join('');
+    // Needs attention
+    const rank = { HIGH: 0, NORMAL: 1, LOW: 2 };
+    const attn = all.map(r => ({ r, a: actionFor(r) })).filter(x => x.a[0] !== 'LOW')
+      .sort((x, y) => rank[x.a[0]] - rank[y.a[0]] || (y.r.rating || 0) - (x.r.rating || 0)).slice(0, 12);
+    $('attn').innerHTML = attn.length ? '<table><tr><th>Office</th><th>Rating</th><th>Weakest</th><th>Next visit</th><th>Recommended action</th></tr>' +
+      attn.map(({ r, a }) => { const wp = worstParam(r), col = r.re === 'HIGH' ? 'var(--high)' : r.re === 'NORMAL' ? 'var(--normal)' : 'var(--low)';
+        return '<tr><td><b>' + esc(r.branch) + '</b><div class="note">' + esc(r.office_type || 'Branch') + '</div></td><td><span class="rbar"><span style="width:' + Math.min(100, (r.rating || 0) / 3 * 100) + '%;background:' + col + '"></span></span><b>' + f2(r.rating) + '</b></td>' +
+          '<td>' + (wp ? PN[wp] + ' ' + f2(r[wp]) : '—') + '</td><td>' + (r.next ? esc(r.next.frequency === 'Semi-Annual' ? r.next.period : monthLabel(r.next.due_month)) + ' <span class="chip st-' + r.next.status + '" style="min-width:auto">' + esc(r.next.status) + '</span>' : '—') + '</td>' +
+          '<td><span class="act a-' + a[0] + '">' + esc(a[1]) + '</span></td></tr>'; }).join('') + '</table>'
+      : '<p class="note">Nothing needs attention — every office is LOW risk and on schedule.</p>';
+    // 1) Group table: Bankwide, Branches, Head Office, Satellite Office
+    $('kpis').innerHTML = '<table><tr><th>Group</th><th>Offices</th><th>S</th><th>U</th><th>C</th><th>H</th><th>Rating</th><th>RE</th><th>Low</th><th>Normal</th><th>High</th></tr>' +
+      GROUPS.map(([g, fn], i) => { const st = groupStats(summaryRows.filter(fn));
+        return '<tr' + (i === 0 ? ' style="background:#F7F9F6;font-weight:700"' : '') + '><td>' + g + '</td><td class="num">' + st.n + '</td>' +
+          st.c.map(v => '<td class="num">' + f2(v) + '</td>').join('') + '<td class="num"><b>' + f2(st.rating) + '</b></td><td>' + chip(bandOf(st.rating)) +
+          '</td><td class="num">' + st.cnt.LOW + '</td><td class="num">' + st.cnt.NORMAL + '</td><td class="num">' + st.cnt.HIGH + '</td></tr>'; }).join('') + '</table>';
+    // 2) Offices, grouped: Head Office, Satellite Office, Branches
+    const q = $('sumSearch').value.trim().toUpperCase();
+    if (!summaryRows.length) { $('sumTable').innerHTML = '<p class="note">No data yet. Import a workbook first.</p>'; return; }
+    const head = '<tr><th>Office</th><th>S</th><th>U</th><th>C</th><th>H</th><th>Rating</th><th>RE</th><th>Frequency</th><th>Last visit</th><th>Next visit</th></tr>';
+    const order = [GROUPS[2], GROUPS[3], GROUPS[1]];
+    let html = '<table>' + head, shown = 0;
+    order.forEach(([g, fn]) => {
+      const all = summaryRows.filter(fn); if (!all.length) return;
+      const rows = all.filter(r => !q || r.branch.indexOf(q) >= 0); if (!rows.length) return;
+      const st = groupStats(all); shown += rows.length;
+      html += '<tr style="background:#E7EFE5"><td style="font-weight:800;color:#14632F">' + g.toUpperCase() + ' · ' + all.length + '</td>' +
+        st.c.map(v => '<td class="num" style="font-weight:700">' + f2(v) + '</td>').join('') +
+        '<td class="num"><b>' + f2(st.rating) + '</b></td><td>' + chip(bandOf(st.rating)) + '</td><td colspan="3"></td></tr>';
+      html += rows.map(r => '<tr><td style="padding-left:20px">' + esc(r.branch) + '</td>' + CF.map(f => '<td class="num">' + f2(r[f]) + '</td>').join('') +
+        '<td class="num"><b>' + f2(r.rating) + '</b></td><td>' + chip(r.re) + '</td><td>' + esc(r.frequency) + '</td><td>' + esc(r.last_visit) +
+        '</td><td>' + (r.next ? (r.next.frequency === 'Semi-Annual' ? esc(r.next.period) + ' (' + esc(r.next.due_window) + ')' : esc(monthLabel(r.next.due_month))) + ' <span class="chip st-' + r.next.status + '">' + esc(r.next.status) + '</span>' : '—') + '</td></tr>').join('');
+    });
+    $('sumTable').innerHTML = shown ? html + '</table>' : '<p class="note">No office matches.</p>';
+  }
+  $('sumSearch').oninput = renderSummary;
+  $('sumRefresh').onclick = loadSummary;
+
+  // ---------- Visit calendar (current + next quarter) ----------
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function monthLabel(d) { if (!d) return '—'; const [y, m] = d.split('-').map(Number); return MON[m - 1] + '-' + String(y).slice(2); }
+  const iso = (y, m) => y + '-' + String(m).padStart(2, '0') + '-01';
+  // ---------- Month calendar ----------
+  let calView = 'month', calCursor = null, calCache = null;
+  document.querySelectorAll('#calView button').forEach(b => b.onclick = () => {
+    calView = b.dataset.view;
+    document.querySelectorAll('#calView button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+    $('calMonth').classList.toggle('hidden', calView !== 'month'); $('calListWrap').classList.toggle('hidden', calView !== 'list');
+    if (calView === 'month') loadMonth(); else loadCalendar();
+  });
+  $('calPrev').onclick = () => { calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() - 1, 1); renderMonth(); };
+  $('calNext').onclick = () => { calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 1); renderMonth(); };
+  $('calToday').onclick = () => { const t = new Date(); calCursor = new Date(t.getFullYear(), t.getMonth(), 1); renderMonth(); };
+  async function loadMonth() {
+    if (!calCursor) { const t = new Date(); calCursor = new Date(t.getFullYear(), t.getMonth(), 1); }
+    const [vis, sch, sum] = await Promise.all([
+      sb.from('v_all_visits').select('*').limit(20000),
+      sb.from('v_visit_schedule').select('*').limit(10000),
+      sb.from('v_branch_summary').select('branch,re,frequency').limit(5000)
+    ]);
+    if (vis.error || sch.error) { $('calGrid').innerHTML = '<span class="err">' + esc((vis.error || sch.error).message) + '</span>'; return; }
+    const band = {}; (sum.data || []).forEach(r => { band[r.branch] = r.re; });
+    calCache = { visits: vis.data, schedule: sch.data, band };
+    renderMonth();
+  }
+  function renderMonth() {
+    if (!calCache) return;
+    const y = calCursor.getFullYear(), m = calCursor.getMonth(), key = iso(y, m + 1), pre = key.slice(0, 7);
+    $('calMonthTitle').textContent = calCursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    // Planned this month (no fixed day): Quarterly/Monthly due this month, and LOW branches whose half-year includes this month.
+    const planned = calCache.schedule.filter(r => r.status !== 'Visited' &&
+      (r.frequency === 'Semi-Annual' ? (r.period_start <= key && r.period_end > key) : r.due_month === key));
+    const stChip = (st) => '<span class="chip st-' + (st === 'Missed' ? 'Overdue' : st) + '" style="min-width:auto">' + st + '</span>';
+    $('calPlanned').innerHTML = planned.length ? '<h3 style="margin:0 0 6px;font-size:14px">Still to visit this month · ' + planned.length + '</h3><div class="planned">' +
+      planned.sort((a, b) => a.branch.localeCompare(b.branch)).map(r => '<span class="pc" title="' + esc(r.frequency + ' · ' + (r.frequency === 'Semi-Annual' ? r.period + ' (' + r.due_window + ')' : r.period)) + '">' +
+        chip(r.risk_rating).replace('class="chip', 'style="min-width:auto" class="chip') + esc(r.branch) + stChip(r.status) + '</span>').join('') + '</div>'
+      : '<p class="note" style="margin:0 0 12px">Nothing left to visit this month.</p>';
+    // Grid
+    const first = new Date(y, m, 1), start = new Date(y, m, 1 - first.getDay());
+    const days = []; for (let i = 0; i < 42; i++) days.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+    while (days.length > 35 && days[days.length - 7].getMonth() !== m) days.splice(-7);
+    const fmt = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const byDay = {}; calCache.visits.forEach(v => { (byDay[v.visit_date] = byDay[v.visit_date] || []).push(v); });
+    const today = fmt(new Date());
+    $('calGrid').innerHTML = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => '<div class="dow">' + d + '</div>').join('') +
+      days.map(d => {
+        const k = fmt(d), list = (byDay[k] || []).sort((a, b) => a.branch.localeCompare(b.branch));
+        const evs = list.slice(0, 3).map(v => '<div class="ev ' + (calCache.band[v.branch] || '') + '" title="' + esc(v.branch + ' · ' + v.source) + '">' + esc(v.branch.replace(/^BR - /, '')) + '</div>').join('');
+        const more = list.length > 3 ? '<button type="button" class="more" data-day="' + k + '">+' + (list.length - 3) + ' more</button>' : '';
+        return '<div class="day' + (d.getMonth() !== m ? ' out' : '') + (k === today ? ' today' : '') + '"><span class="num">' + d.getDate() + '</span>' + evs + more + '</div>';
+      }).join('');
+  }
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest('#calGrid .more'); if (!b) return;
+    const list = calCache.visits.filter(v => v.visit_date === b.dataset.day).map(v => v.branch).sort();
+    b.parentElement.innerHTML = '<span class="num">' + Number(b.dataset.day.slice(8)) + '</span>' +
+      list.map(n => '<div class="ev ' + (calCache.band[n] || '') + '" title="' + esc(n) + '">' + esc(n.replace(/^BR - /, '')) + '</div>').join('');
+  });
+
+  async function loadCalendar() {
+    const now = new Date(); const y = now.getFullYear(), qi = Math.floor(now.getMonth() / 3);
+    const months = []; for (let i = 0; i < 6; i++) { const mm = qi * 3 + i; months.push({ y: y + Math.floor(mm / 12), m: (mm % 12) + 1 }); }
+    const { data, error } = await sb.from('v_visit_schedule').select('*').order('due_month').limit(10000);
+    if (error) { $('calQ1').innerHTML = '<span class="err">' + esc(error.message) + '</span>'; return; }
+    const qName = (mo) => 'Q' + (Math.floor((mo.m - 1) / 3) + 1) + ' ' + mo.y;
+    $('calTitle1').textContent = 'This quarter · ' + qName(months[0]);
+    $('calTitle2').textContent = 'Next quarter · ' + qName(months[3]);
+    const line = (r) => {
+      const st = r.status;
+      const when = st === 'Visited' ? 'visited ' + esc(r.visit_date) : (r.frequency === 'Semi-Annual' ? 'any time in ' + esc(r.due_window) : esc(r.period));
+      return '<li><span class="b">' + esc(r.branch) + '</span><span class="note">' + esc(r.frequency) + ' · ' + when + '</span>' +
+        chip(r.risk_rating) + '<span class="chip st-' + (st === 'Missed' ? 'Overdue' : st) + '">' + st + '</span></li>';
+    };
+    // Quarterly / Monthly: by month.  Semi-Annual (LOW): one list per half-year, visit in either quarter.
+    const monthly = data.filter(r => r.frequency !== 'Semi-Annual');
+    const semis = data.filter(r => r.frequency === 'Semi-Annual');
+    const halfCard = (qStartIso, qEndIso) => {
+      const halves = {}; semis.filter(r => r.period_start < qEndIso && r.period_end > qStartIso).forEach(r => { (halves[r.period] = halves[r.period] || []).push(r); });
+      return Object.keys(halves).sort((a, b) => halves[a][0].period_start < halves[b][0].period_start ? -1 : 1).map(k => {
+        const list = halves[k].sort((a, b) => (a.status === 'Visited') - (b.status === 'Visited') || (a.branch < b.branch ? -1 : 1));
+        const done = list.filter(r => r.status === 'Visited').length, f = list[0];
+        return '<div class="month" style="margin-bottom:12px"><h3>LOW branches · Semi-Annual · ' + esc(k) + ' — visit any time in ' + esc(f.due_window) +
+          ' (by ' + esc(f.due_by) + ') · ' + list.length + ' branches · ' + done + ' visited</h3><ul>' + list.map(line).join('') + '</ul></div>';
+      }).join('');
+    };
+    const q1s = iso(months[0].y, months[0].m), q2s = iso(months[3].y, months[3].m);
+    const q3e = months[5].m === 12 ? iso(months[5].y + 1, 1) : iso(months[5].y, months[5].m + 1);
+    const curHalfEnd = iso(months[0].y + (months[0].m > 6 ? 1 : 0), months[0].m > 6 ? 1 : 7);
+    $('calOverdue').innerHTML = halfCard(q1s, q2s);
+    // Next-quarter section only shows a half-year that starts there (otherwise it is the same list as above).
+    const nextHalf = q2s >= curHalfEnd ? halfCard(q2s, q3e) : '';
+    const card = (mo) => {
+      const key = iso(mo.y, mo.m);
+      const list = monthly.filter(r => r.due_month === key);
+      const done = list.filter(r => r.status === 'Visited').length;
+      return '<div class="month"><h3>' + MON[mo.m - 1] + ' ' + mo.y + ' · ' + list.length + ' planned · ' + done + ' visited</h3><ul>' +
+        (list.length ? list.map(line).join('') : '<li class="note">Nothing scheduled</li>') + '</ul></div>';
+    };
+    $('calQ1').innerHTML = months.slice(0, 3).map(card).join('');
+    $('calQ2').innerHTML = (nextHalf ? '<div style="grid-column:1/-1">' + nextHalf + '</div>' : '') + months.slice(3).map(card).join('');
+  }
+
+  // ---------- Schedule compliance ----------
+  const qStart = (d) => { const y = d.getFullYear(), q = Math.floor(d.getMonth() / 3); return iso(y, q * 3 + 1); };
+  const nextQStart = (d) => { const y = d.getFullYear(), q = Math.floor(d.getMonth() / 3) + 1; return q > 3 ? iso(y + 1, 1) : iso(y, q * 3 + 1); };
+  async function loadCompliance(pick) {
+    const cur = qStart(new Date());
+    await sb.rpc('lock_schedule', { p_quarter_start: cur });   // the current quarter is always locked
+    const { data: sums, error: e1 } = await sb.from('v_schedule_compliance_summary').select('*').order('quarter_start', { ascending: false }).limit(200);
+    if (e1) { $('cmpLists').innerHTML = '<span class="err">' + esc(e1.message) + '</span>'; return; }
+    const sel = $('cmpQuarter'), want = pick || sel.value || cur;
+    sel.innerHTML = sums.map(r => '<option value="' + r.quarter_start + '"' + (r.quarter_start === want ? ' selected' : '') + '>' + r.quarter + (r.quarter_start === cur ? ' (current)' : '') + '</option>').join('');
+    const qs = sel.value || cur, sm = sums.find(r => r.quarter_start === qs) || {};
+    let { data, error } = await sb.from('v_schedule_compliance').select('*').eq('quarter_start', qs).order('branch').limit(5000);
+    if (error) { $('cmpLists').innerHTML = '<span class="err">' + esc(error.message) + '</span>'; return; }
+    data = data.filter(r => r.quarter_start === qs);
+    const groups = [['Visited – scheduled', 'st-Visited'], ['Not visited – scheduled', 'st-Overdue'], ['Visited – not scheduled', 'st-Scheduled']];
+    $('cmpKpis').innerHTML = groups.map(([g, c]) => '<div class="kpi"><b>' + g.toUpperCase() + '</b><span class="v">' + data.filter(r => r.result === g).length + '</span></div>').join('') +
+      '<div class="kpi"><b>COMPLIANCE</b><span class="v">' + (sm.compliance_pct == null ? '—' : sm.compliance_pct + '%') + '</span><span class="note">all visits ÷ scheduled, max 100%' + (sm.scheduled_only_pct == null ? '' : ' · scheduled only: ' + sm.scheduled_only_pct + '%') + '</span></div>';
+    $('cmpLists').innerHTML = groups.map(([g, c]) => { const list = data.filter(r => r.result === g);
+      return '<div class="month"><h3>' + g + ' · ' + list.length + '</h3><ul>' + (list.length ? list.map(r =>
+        '<li><span class="b">' + esc(r.branch) + '</span><span class="note">' +
+        (r.planned ? 'planned ' + esc(r.planned) : 'not on schedule') + (r.first_visit ? ' · visited ' + esc(r.first_visit) + (r.visit_days > 1 ? ' (+' + (r.visit_days - 1) + ')' : '') : '') +
+        '</span>' + (r.risk_rating ? chip(r.risk_rating) : '') + (g === 'Not visited – scheduled' ? '<span class="chip st-Overdue">' + (r.quarter_closed ? 'Missed' : 'Pending') + '</span>' : '') +
+        '</li>').join('') : '<li class="note">None</li>') + '</ul></div>'; }).join('');
+  }
+  $('cmpQuarter').onchange = () => loadCompliance($('cmpQuarter').value);
+  $('cmpLockNext').onclick = async () => {
+    const nq = nextQStart(new Date());
+    const { data, error } = await sb.rpc('lock_schedule', { p_quarter_start: nq });
+    $('cmpStatus').innerHTML = error ? '<span class="err">' + esc(error.message) + '</span>' : '<span class="ok">Next quarter locked: ' + data + ' branch(es) added to its schedule.</span>';
+    loadCompliance(nq);
+  };
+
+  // ---------- Visited branches (visit log) ----------
+  function toMonth(v) {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') { const c = XLSX.SSF.parse_date_code(v); return c ? ymd(c.y, c.m, 1) : null; }
+    const t = String(v).trim(); let m;
+    if ((m = t.match(/^([A-Za-z]{3,9})[-\s.,]+(\d{2}|\d{4})$/))) {          // Oct-26, October 2026
+      const mo = MONTHS[m[1].toLowerCase().slice(0, 3)]; let y = +m[2]; if (y < 100) y += 2000;
+      return mo ? ymd(y, mo, 1) : null;
+    }
+    if ((m = t.match(/^(\d{4})-(\d{1,2})$/))) return ymd(+m[1], +m[2], 1);
+    const d = toDate(v); return d ? d.slice(0, 8) + '01' : null;
+  }
+  let visitRows = [], visitFile = '', visitLog = [];
+  $('vDate').max = new Date().toISOString().slice(0, 10);
+
+  async function loadVisits() {
+    loadVisitLists();
+    const { data, error } = await sb.from('v_visit_records').select('*').order('id', { ascending: false }).limit(5000);
+    if (error) { $('vLog').innerHTML = '<span class="err">' + esc(error.message) + '</span>'; return; }
+    visitLog = data; renderVisitLog();
+  }
+  function renderVisitLog() {
+    const q = $('vSearch').value.trim().toUpperCase();
+    const fy = $('vfYear').value, fq = $('vfQ').value, sort = $('vfSort').value;
+    // Fill the Year list from the data (keeps the current choice).
+    const years = Array.from(new Set(visitLog.map(r => (r.year_quarter || '').slice(0, 4)).filter(Boolean))).sort().reverse();
+    $('vfYear').innerHTML = '<option value="">All years</option>' + years.map(y => '<option' + (y === fy ? ' selected' : '') + '>' + y + '</option>').join('');
+    let rows = visitLog.filter(r => (!q || r.branch.indexOf(q) >= 0) &&
+      (!fy || (r.year_quarter || '').slice(0, 4) === fy) && (!fq || r.q === fq));
+    const byBranch = (a, b) => a.branch.localeCompare(b.branch) || String(b.actual_date_of_visit || '').localeCompare(String(a.actual_date_of_visit || ''));
+    if (sort === 'branch') rows.sort(byBranch);
+    else if (sort === 'date') rows.sort((a, b) => String(b.actual_date_of_visit || '').localeCompare(String(a.actual_date_of_visit || '')) || a.branch.localeCompare(b.branch));
+    else rows.sort((a, b) => String(b.year_quarter || '').localeCompare(String(a.year_quarter || '')) || byBranch(a, b));
+    $('vCount').textContent = rows.length + ' record' + (rows.length === 1 ? '' : 's') + (rows.length > 500 ? ' — showing the first 500' : '') +
+      ' · ' + rows.filter(r => r.visited_status === 'Visited').length + ' visited · ' + rows.filter(r => r.visited_status !== 'Visited').length + ' not visited';
+    rows = rows.slice(0, 500);
+    const tag = (t, ok) => t ? '<span class="chip ' + (ok ? 'st-Visited' : 'st-Overdue') + '">' + esc(t) + '</span>' : '';
+    $('vLog').innerHTML = rows.length ? '<table><tr><th>ID</th><th>Branch</th><th>Visit</th><th>Quarter</th><th>Actual Date of Visit</th><th>Visited</th><th>Scheduled</th><th>Risk</th><th>Q</th><th>IT Technician</th><th>Source</th></tr>' +
+      rows.map(r => '<tr><td class="note">' + esc(r.id) + '</td><td>' + esc(r.branch) + '</td><td>' + esc(r.visit) + '</td><td>' + esc(r.quarter || '') + '</td><td>' + esc(r.actual_date_of_visit || '—') +
+        '</td><td>' + tag(r.visited_status, r.visited_status === 'Visited') + '</td><td>' + tag(r.scheduled_status, r.scheduled_status === 'Scheduled') +
+        '</td><td>' + (r.risk_rating ? chip(r.risk_rating) : '') + '</td><td>' + esc(r.q) + '</td><td>' + esc(r.technician || '') + '</td><td class="note">' + esc(r.source) + '</td></tr>').join('') + '</table>'
+      : '<p class="note">' + (visitLog.length ? 'No branch matches.' : 'No visit records yet.') + '</p>';
+  }
+  $('vSearch').oninput = renderVisitLog;
+  ['vfYear', 'vfQ', 'vfSort'].forEach(id => $(id).onchange = renderVisitLog);
+
+  function showVisitResult(el, msgEl, data) {
+    el.innerHTML = '<span class="ok">Saved ' + data.appended + '</span> · <span class="warn">skipped ' + data.skipped + ' (already logged)</span> · <span class="err">rejected ' + data.rejected + '</span>';
+    if (msgEl) msgEl.innerHTML = data.messages.length ? '<table><tr><th>Where</th><th>Status</th><th>Reason</th></tr>' +
+      data.messages.map(m => '<tr><td>' + esc(m.where) + '</td><td>' + esc(m.status) + '</td><td>' + esc(m.reason) + '</td></tr>').join('') + '</table>' : '';
+  }
+
+  // --- Visit record form (drop-downs only) ---
+  let branchInfo = {}, curFreq = 'Quarterly';
+  (function fillYears() {
+    const y = new Date().getFullYear(); $('vYear').innerHTML = [y - 2, y - 1, y, y + 1].map(v => '<option' + (v === y ? ' selected' : '') + '>' + v + '</option>').join('');
+    $('vQ').value = 'Q' + (Math.floor(new Date().getMonth() / 3) + 1);
+  })();
+  function updatePeriod() {
+    const q = +$('vQ').value.slice(1), y = $('vYear').value, f = curFreq;
+    $('vPeriod').value = f === 'Semi-Annual' ? 'H' + (q <= 2 ? 1 : 2) + ' ' + y : 'Q' + q + ' ' + y;
+    const semi = f === 'Semi-Annual';
+    const ws = semi ? new Date(+y, q <= 2 ? 0 : 6, 1) : new Date(+y, (q - 1) * 3, 1);
+    const qs = new Date(ws.getFullYear(), ws.getMonth() - 6, 1), qe = new Date(ws.getFullYear(), ws.getMonth() + (semi ? 6 : 3), 0), today = new Date();
+    const fmt = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    $('vDate').min = fmt(qs); $('vDate').max = fmt(qe < today ? qe : today);
+  }
+  function updateVisited() {
+    const v = $('vVisited').value === 'Visited';
+    $('vDate').disabled = !v; $('vDate').required = v; if (!v) $('vDate').value = '';
+  }
+  ['vQ', 'vYear'].forEach(id => $(id).onchange = updatePeriod);
+  $('vDate').onchange = () => {
+    const d = $('vDate').value; if (!d || (d >= $('vDate').min && d <= $('vDate').max)) return;
+    const [y, m] = d.split('-').map(Number);
+    if (!Array.from($('vYear').options).some(o => o.value === String(y))) return;
+    $('vYear').value = String(y); $('vQ').value = 'Q' + (Math.floor((m - 1) / 3) + 1); updatePeriod();
+  };
+  $('vVisited').onchange = updateVisited;
+  $('vBranch').onchange = () => {
+    const b = branchInfo[$('vBranch').value];
+    curFreq = b ? b.frequency : 'Quarterly';
+    $('vRating').value = !$('vBranch').value ? 'Choose a branch' : b ? b.re + ' · ' + b.frequency + ' (rating ' + Number(b.rating).toFixed(2) + ')' : 'No rating yet · NORMAL · Quarterly';
+    updatePeriod();
+  };
+  updatePeriod(); updateVisited();
+
+  async function loadVisitLists() {
+    const [sum, techs, logs] = await Promise.all([
+      sb.from('v_branch_summary').select('branch,frequency,re,rating').limit(5000),
+      sb.from('pm_technicians').select('name').eq('active', true).order('name').limit(500),
+      sb.from('v_all_visits').select('branch').limit(10000)
+    ]);
+    branchInfo = {}; (sum.data || []).forEach(r => { branchInfo[r.branch] = r; });
+    const names = Array.from(new Set(Object.keys(branchInfo).concat((logs.data || []).map(r => r.branch)))).sort();
+    const keep = $('vBranch').value;
+    $('vBranch').innerHTML = '<option value="">Choose…</option>' + names.map(n => '<option>' + esc(n) + '</option>').join('');
+    $('vBranch').value = keep;
+    const keepT = $('vTech').value;
+    $('vTech').innerHTML = '<option value="">Choose…</option>' + (techs.data || []).map(t => '<option>' + esc(t.name) + '</option>').join('');
+    $('vTech').value = keepT;
+  }
+
+  $('visitForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const costs = readCostLines();
+    if (costs.error) { $('vStatus').innerHTML = '<span class="err">' + esc(costs.error) + '</span>'; return; }
+    if (costs.rows.length && $('vVisited').value !== 'Visited') { $('vStatus').innerHTML = '<span class="err">Costs can only be added to a visit that took place (Visited, with the actual date).</span>'; return; }
+    $('vSubmit').disabled = true; $('vStatus').textContent = 'Saving…';
+    const row = { where: 'Form', branch: $('vBranch').value, year: $('vYear').value, q: $('vQ').value,
+      period: $('vPeriod').value, visited: $('vVisited').value, scheduled: $('vSched').value,
+      visit_date: $('vDate').value, technician: $('vTech').value, require_date: true };
+    const { data, error } = await sb.rpc('submit_visit_records', { p_source: 'Form', p_rows: [row] });
+    $('vSubmit').disabled = false;
+    if (error) { $('vStatus').innerHTML = '<span class="err">' + esc(error.message) + '</span>'; return; }
+    if (data.rejected) { $('vStatus').innerHTML = '<span class="err">Not saved: ' + esc(data.messages[0].reason) + '</span>'; return; }
+    $('vStatus').innerHTML = data.appended ? '<span class="ok">Saved: ' + esc(row.branch) + ' · ' + esc(row.period) + ' · ' + esc(row.visited) + (row.visit_date ? ' on ' + esc(row.visit_date) : '') + '.</span>'
+      : '<span class="warn">This record was already submitted — nothing changed.</span>';
+    if (costs.rows.length) {
+      const { data: cr, error: ce } = await sb.rpc('submit_visit_costs', { p_source: 'Form', p_rows: costs.rows.map(r => Object.assign({ branch: row.branch, visit_date: row.visit_date }, r)) });
+      if (ce) $('vStatus').innerHTML += '<br><span class="err">Costs not saved: ' + esc(ce.message) + '</span>';
+      else {
+        $('vStatus').innerHTML += '<br><span class="ok">Costs saved: ' + cr.appended + ' line' + (cr.appended === 1 ? '' : 's') + '</span>' + (cr.skipped ? ' · <span class="warn">' + cr.skipped + ' already recorded</span>' : '') +
+          (cr.rejected ? ' · <span class="err">' + cr.rejected + ' rejected: ' + esc(cr.messages.filter(m => m.status === 'rejected').map(m => m.reason).join('; ')) + '</span>' : '');
+        if (!cr.rejected) { $('vCosts').innerHTML = ''; updateCostTotal(); }
+      }
+    }
+    loadVisits();
+  };
+
+  // Header names are compared without spaces, slashes or case: "Visited / Not Visited" = "visitednotvisited".
+  const norm = (h) => String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const VCOLS = {
+    branch: ['branch', 'branchname', 'office'],
+    period: ['visit', 'visitperiod', 'period'],
+    freq: ['quarter', 'frequency', 'visitfrequency'],
+    date: ['actualdateofvisit', 'actualdate', 'dateofvisit', 'visitdate', 'datevisited', 'date'],
+    visited: ['visitednotvisited', 'visitedstatus', 'visited', 'status'],
+    sched: ['schedulednotscheduled', 'scheduledstatus', 'scheduled'],
+    risk: ['riskrating', 'risk', 're'],
+    q: ['q'],
+    year: ['year'],
+    tech: ['ittechnician', 'technician', 'tech']
+  };
+  function mapHeader(row) {
+    const n = row.map(norm), col = {};
+    Object.entries(VCOLS).forEach(([k, names]) => { for (const nm of names) { const i = n.indexOf(nm); if (i >= 0) { col[k] = i; break; } } });
+    return col;
+  }
+
+  // Optional "Costs" sheet in the visit workbook.
+  const CCOLS = {
+    branch: ['branch', 'branchname', 'office'], date: ['date', 'visitdate', 'actualdateofvisit', 'dateofvisit'],
+    category: ['category', 'costcategory', 'costtype'], description: ['description', 'item', 'particulars', 'details'],
+    qty: ['qty', 'quantity'], unit: ['unitcost', 'unitprice', 'cost', 'price'], amount: ['amount', 'total', 'totalcost']
+  };
+  let costRows = [];
+  function readCostSheet(name, grid) {
+    for (let i = 0; i < Math.min(15, grid.length); i++) {
+      const n = grid[i].map(norm), col = {};
+      Object.entries(CCOLS).forEach(([k, names]) => { for (const nm of names) { const j = n.indexOf(nm); if (j >= 0) { col[k] = j; break; } } });
+      if (col.branch == null || (col.unit == null && col.amount == null)) continue;
+      const get = (r, k) => col[k] == null ? '' : r[col[k]];
+      let count = 0;
+      for (let j = i + 1; j < grid.length; j++) {
+        const r = grid[j]; if (!cellText(get(r, 'branch'))) continue;
+        const qty = +cellText(get(r, 'qty')) || 1, unit = cellText(get(r, 'unit')), amt = cellText(get(r, 'amount'));
+        costRows.push({ where: name + ' row ' + (j + 1), branch: caps(cellText(get(r, 'branch'))), visit_date: toDate(get(r, 'date')),
+          category: caps(cellText(get(r, 'category'))), description: caps(cellText(get(r, 'description'))), qty: qty,
+          unit_cost: unit !== '' ? unit.replace(/[₱,\s]/g, '') : amt !== '' ? String(+amt.replace(/[₱,\s]/g, '') / qty) : '' });
+        count++;
+      }
+      return count;
+    }
+    return null;
+  }
+
+  $('vFile').onchange = async (ev) => {
+    visitRows = []; costRows = []; visitFile = ''; $('vResult').textContent = ''; $('vMessages').innerHTML = ''; $('vUpload').disabled = true;
+    const f = ev.target.files[0]; if (!f) return;
+    try {
+      const wb = XLSX.read(await f.arrayBuffer(), { cellDates: false });
+      const used = [], costUsed = [];
+      for (const name of wb.SheetNames) {
+        const grid = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '', blankrows: true });
+        if (/cost/i.test(name)) { const n = readCostSheet(name, grid); if (n != null) { costUsed.push({ name, count: n }); continue; } }
+        // The header row can be anywhere in the first 15 rows.
+        let hi = -1, col = null;
+        for (let i = 0; i < Math.min(15, grid.length); i++) {
+          const c = mapHeader(grid[i]);
+          if (c.branch != null && c.visited != null) { hi = i; col = c; break; }
+        }
+        if (hi < 0) continue;
+        const get = (r, k) => col[k] == null ? '' : r[col[k]];
+        let count = 0;
+        for (let i = hi + 1; i < grid.length; i++) {
+          const r = grid[i];
+          if (!cellText(get(r, 'branch'))) continue;
+          const raw = get(r, 'date');
+          visitRows.push({ where: name + ' row ' + (i + 1), row: i + 1, branch: cellText(get(r, 'branch')),
+            period: cellText(get(r, 'period')), frequency: cellText(get(r, 'freq')),
+            visit_date: toDate(raw), raw_date: cellText(raw), visited: cellText(get(r, 'visited')),
+            scheduled: cellText(get(r, 'sched')), risk_rating: cellText(get(r, 'risk')),
+            q: cellText(get(r, 'q')), year: cellText(get(r, 'year')), technician: cellText(get(r, 'tech')) });
+          count++;
+        }
+        const missing = ['sched'].filter(k => col[k] == null).concat(col.q == null && col.date == null && col.period == null ? ['Q'] : []);
+        used.push({ name, count, missing });
+      }
+      if (!used.length && !costUsed.length) {
+        $('vFileStatus').innerHTML = '<span class="err">No sheet with both a Branch column and a Visited/Not Visited column (or a Costs sheet) was found in this file.</span>';
+        return;
+      }
+      visitFile = f.name;
+      $('vFileStatus').innerHTML = (used.length ? '<span class="ok">' + visitRows.length + ' rows found</span> in ' +
+        used.map(u => '"' + esc(u.name) + '" (' + u.count + ')' + (u.missing.length ? ' <span class="err">missing column: ' + esc(u.missing.join(', ')) + '</span>' : '')).join(', ') + '.' : '') +
+        (costUsed.length ? (used.length ? '<br>' : '') + '<span class="ok">' + costRows.length + ' cost lines</span> in ' + costUsed.map(u => '"' + esc(u.name) + '"').join(', ') + '.' : '');
+      $('vUpload').disabled = !(visitRows.length || costRows.length);
+    } catch (e) { $('vFileStatus').innerHTML = '<span class="err">Could not read the file: ' + esc(e.message) + '</span>'; }
+  };
+
+  $('vUpload').onclick = async () => {
+    if (!visitRows.length && !costRows.length) return;
+    $('vUpload').disabled = true; $('vResult').textContent = 'Saving…';
+    let tot = { appended: 0, skipped: 0, rejected: 0, messages: [] };
+    for (let i = 0; i < visitRows.length; i += 500) {
+      const { data, error } = await sb.rpc('submit_visit_records', { p_source: visitFile, p_rows: visitRows.slice(i, i + 500) });
+      if (error) { $('vResult').innerHTML = '<span class="err">' + esc(error.message) + '</span>'; return; }
+      tot.appended += data.appended; tot.skipped += data.skipped; tot.rejected += data.rejected; tot.messages = tot.messages.concat(data.messages);
+    }
+    let ctot = null;
+    for (let i = 0; i < costRows.length; i += 500) {
+      const { data, error } = await sb.rpc('submit_visit_costs', { p_source: visitFile, p_rows: costRows.slice(i, i + 500) });
+      if (error) { tot.messages.push({ where: 'Costs', status: 'rejected', reason: error.message }); break; }
+      ctot = ctot || { appended: 0, skipped: 0, rejected: 0 };
+      ctot.appended += data.appended; ctot.skipped += data.skipped; ctot.rejected += data.rejected; tot.messages = tot.messages.concat(data.messages);
+    }
+    showVisitResult($('vResult'), $('vMessages'), tot);
+    if (ctot) $('vResult').innerHTML += '<br>Costs: <span class="ok">saved ' + ctot.appended + '</span> · <span class="warn">skipped ' + ctot.skipped + ' (already recorded)</span> · <span class="err">rejected ' + ctot.rejected + '</span>';
+    visitRows = []; costRows = []; $('vFile').value = ''; $('vFileStatus').textContent = '';
+    loadVisits();
+  };
+
+  // ---------- Submit a data record ----------
+  // OPTS / MODULES are only a fallback until such_migration_01.sql has been run; the live lists come from pm_lists
+  // (Admin › Lists & ratings). Every list also offers "(NEW)" — new values are saved in caps as PENDING REVIEW.
+  const OPTS = {
+    Brand: ['LENOVO', 'VIEWPLUS', 'HP', 'ASUS', 'ACER', 'DELL', 'AOC', 'HUAWEI', 'CLONE', 'OTHER'],
+    'Unit Type': ['LAPTOP', 'ALL IN ONE', 'CPU/DESKTOP'],
+    OS: ['WINDOWS 11 PRO', 'WINDOWS 11 PRO 25H2', 'WINDOWS 11 HOME', 'WINDOWS 10 PRO', 'WINDOWS 10 HOME'],
+    Type: ['WIFI', 'LAN'],
+    Telco: ['PLDT ENTERPRISE', 'CONVERGE', 'STARLINK', 'GLOBE', 'ZEN', 'NA'],
+    Telco2: ['NA', 'PLDT ENTERPRISE', 'CONVERGE', 'STARLINK', 'GLOBE', 'ZEN'],
+    IS: ['0', '1', '2', '3'], AV: ['0', '1'], FW: ['0', '1'],
+    Position: ['MANAGERIAL', 'SUPERVISORY', 'RANK & FILE']
+  };
+  const MODULES = ['EPORTAL', 'FOA MODULE', 'ELECTRONIC LIBRARY', 'LOANS MODULE', 'ROPA MODULE', 'HR MODULE', 'ACCOUNTING MODULE',
+    'TREASURY MODULE', 'COMPLIANCE MODULE', 'LOANS AND DEPOSIT LIBRARY', 'DEPOSIT MODULE', 'SMS MODULE', 'INSTALL'];
+  const FIELDS = {
+    H: [['User', 'text'], ['Brand', 'select'], ['Unit Type', 'select'], ['Date of Acquisition', 'date']],
+    S: [['User', 'text'], ['Brand', 'select'], ['Unit Type', 'select'], ['OS', 'select']],
+    C: [['User', 'text'], ['Type', 'select'], ['Telco', 'select'], ['Telco2', 'select'], ['Branch Speed', 'number'], ['IS', 'select'], ['AV', 'select'], ['FW', 'select']],
+    U: [['EMPLOYEE NAME', 'text'], ['Position', 'select']]
+  };
+  let scoreRules = [], osRatings = [], dItems = {};
+  const fid = (n) => 'df_' + n.replace(/[^A-Za-z0-9]/g, '_');
+  const LIST_OF = { Brand: 'BRAND', 'Unit Type': 'UNIT TYPE', OS: 'OS', Type: 'TYPE', Telco: 'TELCO', Telco2: 'TELCO', Position: 'POSITION' };
+  const NEW = '__new__';
+  const caps = (s) => String(s == null ? '' : s).trim().replace(/\s+/g, ' ').toUpperCase();
+  let lists = null, posRules = {}, extraSystems = [], confirmedNew = {};
+  async function loadLists() {
+    const [pl, pr] = await Promise.all([
+      sb.from('pm_lists').select('*').order('sort_order', { ascending: true, nullsFirst: false }).order('value').limit(5000),
+      sb.from('pm_position_rules').select('*').limit(100)
+    ]);
+    lists = null;
+    if (!pl.error && pl.data && pl.data.length) { lists = {}; pl.data.forEach(r => { (lists[r.list] = lists[r.list] || []).push(r); }); }
+    posRules = {}; (pr.data || []).forEach(r => { posRules[r.position] = r; });
+  }
+  function listValues(l, all) { return lists && lists[l] ? lists[l].filter(x => all || x.active).map(x => x.value) : null; }
+  function optionsFor(n) {
+    const v = LIST_OF[n] && listValues(LIST_OF[n]);
+    if (!v) return OPTS[n];
+    return n === 'Telco2' ? ['NA'].concat(v.filter(x => x !== 'NA')) : v;
+  }
+  const allSystems = () => listValues('SYSTEM', true) || MODULES;
+  function systemList() { return (listValues('SYSTEM') || MODULES).concat(extraSystems.filter(s => !(listValues('SYSTEM') || MODULES).includes(s))); }
+  // ---- Typo check: the closest existing value (a letter or two different, or one contains the other) ----
+  function lev(a, b) {
+    const m = a.length, n = b.length; let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+    return prev[n];
+  }
+  function closest(v, opts) {
+    v = caps(v); if (!v || !opts) return null;
+    if (opts.includes(v)) return v;
+    let best = null, bd = 99;
+    opts.forEach(o => { const d = lev(v.replace(/\s/g, ''), o.replace(/\s/g, '')); if (d <= (o.length > 8 ? 2 : 1) && d < bd) { best = o; bd = d; } });
+    if (!best && v.length >= 4) best = opts.find(o => o.length >= 4 && (o.indexOf(v) >= 0 || v.indexOf(o) >= 0)) || null;
+    return best;
+  }
+  function needsConfirm(inputId, opts) { const v = caps($(inputId).value), c = closest(v, opts); return !!(v && c && c !== v && confirmedNew[inputId] !== v); }
+  function checkNew(inputId, opts, hintId, onUse) {
+    const v = caps($(inputId).value), h = $(hintId), c = closest(v, opts);
+    if (!v) { h.innerHTML = ''; return; }
+    if (!c || confirmedNew[inputId] === v) { h.innerHTML = '<span class="ok">New value · it will be saved in caps and sent to admin for review.</span>'; return; }
+    h.innerHTML = c === v ? '<b>' + esc(c) + '</b> is already on the list. <button type="button" class="secondary mini" data-use>Use it</button>'
+      : '<span class="warn">Did you mean <b>' + esc(c) + '</b>?</span> <button type="button" class="secondary mini" data-use>Use ' + esc(c) + '</button> <button type="button" class="secondary mini" data-keep>No, it is new</button>';
+    h.querySelector('[data-use]').onclick = () => onUse(c);
+    const k = h.querySelector('[data-keep]'); if (k) k.onclick = () => { confirmedNew[inputId] = v; checkNew(inputId, opts, hintId, onUse); };
+  }
+  function capsInput(el) { el.addEventListener('input', () => { const p = el.selectionStart; el.value = el.value.toUpperCase(); try { el.setSelectionRange(p, p); } catch (e) {} }); }
+  const RATING_HELP = '<b>1 · LOW — Current:</b> latest supported release (e.g. Windows 11 24H2 / 25H2).<br><b>2 · NORMAL — Outdated:</b> still gets Microsoft security updates but is not the latest version.<br><b>3 · HIGH — End of support:</b> no more security updates (e.g. Windows 10, 8.1, 7, XP).';
+  function selectField(n) {
+    const id = fid(n), l = LIST_OF[n];
+    return '<select id="' + id + '"><option value="">—</option>' + optionsFor(n).map(o => '<option>' + esc(o) + '</option>').join('') +
+      (l ? '<option value="' + NEW + '">(NEW) not on the list…</option>' : '') + '</select>' +
+      (l ? '<span class="newBox hidden" id="' + id + '_nb"><input id="' + id + '_new" class="caps" placeholder="TYPE THE NEW ' + esc(n.toUpperCase()) + '" autocomplete="off"><span class="note" id="' + id + '_hint"></span>' +
+        (n === 'OS' ? '<select id="' + id + '_rating"><option value="1">1 · LOW — current</option><option value="2">2 · NORMAL — outdated</option><option value="3">3 · HIGH — end of support</option></select><span class="note">' + RATING_HELP + '</span>' : '') + '</span>' : '');
+  }
+  function useExisting(n, v) {
+    const s = $(fid(n));
+    if (!Array.from(s.options).some(o => o.value === v)) s.add(new Option(v, v), s.options.length - 1);
+    s.value = v; $(fid(n) + '_nb').classList.add('hidden'); $(fid(n) + '_new').value = ''; $(fid(n) + '_hint').innerHTML = ''; updateScore();
+  }
+  function renderFields() {
+    const c = $('dCat').value; confirmedNew = {}; extraSystems = [];
+    $('dKeyLabel').firstChild.textContent = c === 'U' ? 'Employee No. (or name if none)' : 'Serial';
+    $('dFields').innerHTML = FIELDS[c].map(([n, t]) => '<label>' + esc(n) + (t === 'select' ? selectField(n)
+        : '<input id="' + fid(n) + '" type="' + t + '"' + (t === 'number' ? ' min="0" step="any"' : '') + (t === 'text' ? ' class="caps"' : '') + '>') + '</label>').join('') +
+      (c === 'U' ? '<fieldset style="grid-column:1/-1;border:1px solid var(--line);border-radius:8px;padding:10px 12px"><legend class="note" style="padding:0 6px">System access and training · tick each system the user can access, then say if training was conducted (no training = risky)</legend>' +
+        '<div id="dSys" class="box" style="margin:0"></div>' +
+        '<div class="row" style="margin:8px 0 0"><input id="dNewSys" class="caps" placeholder="NEW SYSTEM NOT ON THE LIST" autocomplete="off" style="flex:1 1 260px"><button type="button" class="secondary" id="dAddSys">Add system</button></div>' +
+        '<p id="dNewSysHint" class="note" style="margin:6px 0 0"></p></fieldset>' : '');
+    $('dFields').querySelectorAll('input,select').forEach(el => { el.oninput = updateScore; el.onchange = updateScore; });
+    $('dFields').querySelectorAll('input.caps').forEach(capsInput);
+    Object.keys(LIST_OF).forEach(n => {
+      const s = $(fid(n)); if (!s) return;
+      s.addEventListener('change', () => { $(fid(n) + '_nb').classList.toggle('hidden', s.value !== NEW); if (s.value === NEW) $(fid(n) + '_new').focus(); });
+      $(fid(n) + '_new').addEventListener('input', () => checkNew(fid(n) + '_new', listValues(LIST_OF[n], true) || OPTS[n], fid(n) + '_hint', (v) => useExisting(n, v)));
+    });
+    if (c === 'U') {
+      renderSystems({});
+      $('dNewSys').oninput = () => checkNew('dNewSys', allSystems().concat(extraSystems), 'dNewSysHint', tickSystem);
+      $('dAddSys').onclick = () => {
+        const v = caps($('dNewSys').value); if (!v) return;
+        if (needsConfirm('dNewSys', allSystems().concat(extraSystems))) { $('dNewSys').oninput(); return; }
+        tickSystem(v);
+      };
+    }
+    $('dKey').value = ''; $('dPrefill').textContent = ''; loadKeys(); updateScore();
+  }
+  function renderSystems(st) {
+    $('dSys').innerHTML = '<table class="sysT"><tr><th>System</th><th>Has access</th><th>Training conducted?</th></tr>' + systemList().map(s => { const v = st[s] || {};
+      return '<tr data-sys="' + esc(s) + '"' + (v.a && v.t === 'N' ? ' class="untrained"' : '') + '><td>' + esc(s) +
+        (allSystems().includes(s) ? '' : ' <span class="chip st-Due" style="min-width:auto">NEW</span>') + '</td>' +
+        '<td><input type="checkbox" class="dMod" aria-label="' + esc(s) + ' access"' + (v.a ? ' checked' : '') + ' style="min-height:auto;width:18px;height:18px"></td>' +
+        '<td><select class="dTrain" aria-label="' + esc(s) + ' training"' + (v.a ? '' : ' disabled') + '><option value="">—</option><option value="Y"' + (v.t === 'Y' ? ' selected' : '') + '>YES</option>' +
+        '<option value="N"' + (v.t === 'N' ? ' selected' : '') + '>NO (risky)</option></select></td></tr>'; }).join('') + '</table>';
+  }
+  function sysState() {
+    const st = {}; document.querySelectorAll('#dSys tr[data-sys]').forEach(tr => { st[tr.dataset.sys] = { a: tr.querySelector('.dMod').checked, t: tr.querySelector('.dTrain').value }; });
+    return st;
+  }
+  function tickSystem(v) {
+    const st = sysState(); if (!systemList().includes(v)) extraSystems.push(v);
+    st[v] = { a: true, t: (st[v] || {}).t || '' }; renderSystems(st);
+    $('dNewSys').value = ''; $('dNewSysHint').innerHTML = ''; updateScore();
+  }
+  $('dFields').addEventListener('change', (ev) => {
+    const tr = ev.target.closest && ev.target.closest('tr[data-sys]'); if (!tr) return;
+    const a = tr.querySelector('.dMod').checked, sel = tr.querySelector('.dTrain');
+    sel.disabled = !a; if (!a) sel.value = '';
+    tr.classList.toggle('untrained', a && sel.value === 'N'); updateScore();
+  });
+  function fieldVal(n) {
+    const el = $(fid(n)); if (!el) return '';
+    if (el.value === NEW) return caps($(fid(n) + '_new').value);
+    return el.tagName === 'INPUT' && el.type === 'text' ? caps(el.value) : el.value.trim();
+  }
+  function collect() {
+    const c = $('dCat').value, d = {};
+    FIELDS[c].forEach(([n]) => { const v = fieldVal(n); if (v !== '') d[n] = v; });
+    if (c === 'C' && (d.IS || d.AV || d.FW)) d.Total = String((+d.IS || 0) + (+d.AV || 0) + (+d.FW || 0));
+    if (c === 'S' && d.OS) { const r = $(fid('OS')).value === NEW ? +$(fid('OS') + '_rating').value : osRating(d.OS); if (r != null) d.Rating = String(r); }
+    if (c === 'U') {
+      const st = sysState(); let n = 0, u = 0;
+      Object.entries(st).forEach(([s, v]) => { d[s] = v.a ? '1' : '0'; if (v.a) { n++; d[s + ' TRAINED'] = v.t; if (v.t !== 'Y') u++; } });
+      d.COUNT = String(n); d.UNTRAINED = String(u);
+    }
+    return d;
+  }
+  // Same rule as pm_user_score() in the database.
+  function userScore(n, u, pos) {
+    let s = (n === 0 || u === 0) ? 1 : (u * 2 < n ? 2 : 3);
+    const r = posRules[caps(pos)];
+    if (r) { if (r.expected_max_access != null && n > r.expected_max_access) s++; if (u > 0 && r.any_untrained_min != null) s = Math.max(s, +r.any_untrained_min); }
+    return Math.min(s, 3);
+  }
+  function osRating(os) {
+    const hit = lists && lists.OS && lists.OS.find(o => o.value === caps(os));
+    if (hit && hit.rating) return hit.rating;
+    const m = osRatings.filter(o => new RegExp('^' + o.os_pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$', 'i').test(os))
+      .sort((a, b) => b.os_pattern.length - a.os_pattern.length)[0];
+    return m ? m.rating : null;
+  }
+  function ruleScore(c, v) {
+    const r = scoreRules.filter(x => x.category === c && v >= +x.from_value && (x.to_value == null || v < +x.to_value)).sort((a, b) => b.from_value - a.from_value)[0];
+    return r ? +r.score : null;
+  }
+  function updateScore() {
+    const c = $('dCat').value, d = collect(), date = $('dDate').value; let v = null, why = '';
+    if (c === 'H' && d['Date of Acquisition'] && date) {
+      const a = new Date(d['Date of Acquisition']), t = new Date(date);
+      let yrs = t.getFullYear() - a.getFullYear(); if (t.getMonth() < a.getMonth() || (t.getMonth() === a.getMonth() && t.getDate() < a.getDate())) yrs--;
+      v = ruleScore('H', yrs); why = yrs + ' yr' + (yrs === 1 ? '' : 's') + ' old';
+    } else if (c === 'S' && d.Rating) { v = ruleScore('S', +d.Rating); if (v == null) v = +d.Rating; why = 'OS rating ' + d.Rating; }
+    else if (c === 'C' && d.Total) { v = ruleScore('C', +d.Total); why = 'Total ' + d.Total; }
+    else if (c === 'U') {
+      const n = +d.COUNT, u = +d.UNTRAINED, r = posRules[caps(d.Position)];
+      v = userScore(n, u, d.Position);
+      why = n + ' system' + (n === 1 ? '' : 's') + ', ' + u + ' without training' +
+        (r && r.expected_max_access != null && n > r.expected_max_access ? ', more than the ' + r.expected_max_access + ' expected for ' + r.position : '');
+    }
+    const b = v == null ? '' : (v < 1.5 ? 'LOW' : v < 2.5 ? 'NORMAL' : 'HIGH');
+    $('dScore').textContent = v == null ? 'Score: — (fill in the details)' : 'Score: ' + v.toFixed(2) + ' · ' + b + ' (' + why + ')';
+    $('dScore').className = 'pill ' + (b ? 'chip ' + b : ''); $('dScore').style.cssText = b ? 'min-width:auto' : 'background:#F3F4F6;color:#374151';
+  }
+  async function loadKeys() {
+    const c = $('dCat').value, br = $('dBranch').value; dItems = {}; $('dKeyList').innerHTML = '';
+    if (!br) return;
+    const { data } = await sb.from('pm_entries').select('item_key,user_name,visit_date,data').eq('category', c).eq('branch', br).order('visit_date', { ascending: false }).limit(2000);
+    (data || []).forEach(r => { if (!dItems[r.item_key]) dItems[r.item_key] = r; });
+    $('dKeyList').innerHTML = Object.keys(dItems).sort().map(k => '<option value="' + esc(k) + '">' + esc(dItems[k].user_name || '') + '</option>').join('');
+  }
+  function prefill() {
+    const it = dItems[$('dKey').value.trim().toUpperCase()];
+    if (!it) { $('dPrefill').textContent = $('dKey').value.trim() ? 'New ' + ($('dCat').value === 'U' ? 'employee' : 'device') + ' — fill in the details.' : ''; return; }
+    const d = it.data || {}, get = (n) => { const k = Object.keys(d).find(x => x.toLowerCase().replace(/[^a-z0-9]/g, '') === n.toLowerCase().replace(/[^a-z0-9]/g, '')); return k ? d[k] : ''; };
+    FIELDS[$('dCat').value].forEach(([n, t]) => { let v = get(n) || (n === 'User' || n === 'EMPLOYEE NAME' ? it.user_name || '' : '');
+      if (t === 'date' && v && !/^\d{4}-\d{2}-\d{2}/.test(v)) v = '';
+      const el = $(fid(n));
+      if (t === 'select' && v) { v = caps(v); if (!Array.from(el.options).some(o => o.value === v)) el.add(new Option(v, v), LIST_OF[n] ? el.options.length - 1 : null); }
+      el.value = t === 'date' ? String(v).slice(0, 10) : v;
+      if ($(fid(n) + '_nb')) $(fid(n) + '_nb').classList.add('hidden'); });
+    if ($('dCat').value === 'U') {
+      const st = {};
+      allSystems().forEach(s => { if (String(get(s)) === '1') { st[s] = { a: true, t: String(get(s + ' TRAINED') || '').toUpperCase() }; if (!systemList().includes(s)) extraSystems.push(s); } });
+      renderSystems(st);
+    }
+    $('dPrefill').innerHTML = '<span class="ok">Details copied from the last record (' + esc(it.visit_date) + '). Change only what is different.</span>';
+    updateScore();
+  }
+  $('dCat').onchange = renderFields;
+  $('dBranch').onchange = () => { loadKeys(); $('dKey').value = ''; $('dPrefill').textContent = ''; };
+  $('dKey').onchange = prefill; $('dDate').onchange = updateScore;
+  async function loadDataForm() {
+    const t = new Date(), today = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+    $('dDate').max = today; if (!$('dDate').value) $('dDate').value = today;
+    const [units, rules, os] = await Promise.all([
+      sb.from('v_office_units').select('unit').limit(5000),
+      sb.from('pm_score_rules').select('*').limit(500),
+      sb.from('pm_os_ratings').select('*').limit(500),
+      loadLists()
+    ]);
+    scoreRules = rules.data || []; osRatings = os.data || [];
+    const keep = $('dBranch').value;
+    $('dBranch').innerHTML = '<option value="">Choose…</option>' + Array.from(new Set((units.data || []).map(r => r.unit))).sort().map(n => '<option>' + esc(n) + '</option>').join('');
+    $('dBranch').value = keep;
+    if (!$('dFields').innerHTML) renderFields(); else updateScore();
+  }
+  $('dForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const c = $('dCat').value, key = caps($('dKey').value), d = collect(), date = $('dDate').value, br = $('dBranch').value;
+    const stop = (m) => { $('dStatus').innerHTML = '<span class="err">' + esc(m) + '</span>'; };
+    // NEW values: must be typed, and a near-match of an existing value must be confirmed first (typo check).
+    const news = [];
+    for (const [n] of FIELDS[c]) {
+      const el = $(fid(n)); if (!el || el.value !== NEW) continue;
+      const v = caps($(fid(n) + '_new').value), opts = listValues(LIST_OF[n], true) || OPTS[n];
+      if (!v) return stop('Type the new ' + n + ', or pick one from the list.');
+      if (needsConfirm(fid(n) + '_new', opts)) { checkNew(fid(n) + '_new', opts, fid(n) + '_hint', (x) => useExisting(n, x)); return stop('Check the flagged ' + n + ': use the suggested value or confirm that it is new.'); }
+      news.push({ list: LIST_OF[n], value: v, rating: n === 'OS' ? +$(fid('OS') + '_rating').value : null });
+    }
+    if (c === 'U') {
+      const st = sysState(), miss = Object.keys(st).filter(s => st[s].a && !st[s].t);
+      if (miss.length) return stop('Say whether training was conducted for: ' + miss.join(', ') + '.');
+      extraSystems.filter(s => st[s] && st[s].a).forEach(s => news.push({ list: 'SYSTEM', value: s, rating: null }));
+    }
+    d.DATE = date; d.Branch = br; if (c === 'U') { d['EMPLOYEE NO'] = /^\d+$/.test(key) ? key : ''; } else d.SERIAL = key;
+    $('dSubmit').disabled = true; $('dStatus').textContent = 'Saving…';
+    const added = [];
+    for (const nv of news) {
+      const { data: r, error } = await sb.rpc('pm_list_add', { p_list: nv.list, p_value: nv.value, p_rating: nv.rating });
+      if (error) { $('dSubmit').disabled = false; return stop('Could not add the new ' + nv.list + ' "' + nv.value + '": ' + error.message); }
+      if (r && r.new) added.push(nv.value);
+    }
+    // The new User rule and the rating of a new OS are computed here and sent as the score.
+    let score = '';
+    if (c === 'U') score = String(userScore(+d.COUNT, +d.UNTRAINED, d.Position));
+    else if (c === 'S' && d.Rating) { const s = ruleScore('S', +d.Rating); score = String(s == null ? +d.Rating : s); }
+    const { data: batch, error: e1 } = await sb.rpc('start_import', { p_source_file: 'Data entry form' });
+    if (e1) { $('dSubmit').disabled = false; $('dStatus').innerHTML = '<span class="err">' + esc(e1.message) + '</span>'; return; }
+    const row = { sheet: 'Form', row: null, category: c, visit_date: date, branch: br, item_key: key,
+      user_name: c === 'U' ? (d['EMPLOYEE NAME'] || key) : (d.User || ''), score: score, data: d };
+    const { data: res, error } = await sb.rpc('import_entries', { p_batch_id: batch, p_rows: [row] });
+    $('dSubmit').disabled = false;
+    if (error) { $('dStatus').innerHTML = '<span class="err">' + esc(error.message) + '</span>'; return; }
+    if (res.rejected) { $('dStatus').innerHTML = '<span class="err">Not saved: ' + esc(res.messages[0].reason) + '</span>'; return; }
+    $('dStatus').innerHTML = res.appended ? '<span class="ok">Saved: ' + esc(br) + ' · ' + c + ' · ' + esc(key.toUpperCase()) + ' · ' + esc(date) + '. The branch rating is updated.</span>'
+      : '<span class="warn">This ' + (c === 'U' ? 'employee' : 'device') + ' already has a record on ' + esc(date) + ' — nothing changed.</span>';
+    if (added.length) {
+      $('dStatus').innerHTML += '<br><span class="warn">New on the list, sent to admin for review: ' + added.map(esc).join(', ') + '</span>';
+      await loadLists(); renderFields();
+    } else loadKeys();
+    loadDataHistory(); loadSummary();
+  };
+
+  // Excel import: User sheets in the new format (system columns with Y / N) are scored here with the new rule;
+  // OS values that are not on the list are added as 1 · LOW for admin review. Returns the new OS names.
+  async function prepareImportRows() {
+    if (!lists) await loadLists();
+    if (!lists) return [];
+    const sysAll = allSystems(), knownOS = new Set(listValues('OS', true) || []), newOS = new Set();
+    rows.forEach(r => {
+      const d = r.data, keys = Object.keys(d);
+      if (r.category === 'S') {
+        const k = keys.find(x => /^os$/i.test(x.trim()));
+        if (k && String(d[k]).trim()) { d[k] = caps(d[k]); if (!knownOS.has(d[k])) newOS.add(d[k]); }
+      }
+      if (r.category === 'U') {
+        const sk = keys.filter(k => sysAll.includes(caps(k)));
+        if (!sk.some(k => /^(Y|N|YES|NO)$/i.test(String(d[k]).trim()))) return;           // old format: scored as before
+        const out = {}; let n = 0, u = 0;
+        keys.forEach(k => { if (!sk.includes(k)) out[k] = d[k]; });
+        sk.forEach(k => {
+          const s = caps(k), v = caps(d[k]), a = ['Y', 'YES', 'N', 'NO', '1'].includes(v);
+          out[s] = a ? '1' : '0';
+          if (a) { n++; out[s + ' TRAINED'] = (v === 'Y' || v === 'YES') ? 'Y' : v === '1' ? '' : 'N'; if (out[s + ' TRAINED'] !== 'Y') u++; }
+        });
+        const pk = keys.find(x => /^position$/i.test(x.trim()));
+        if (pk) { const p = caps(d[pk]); delete out[pk]; out.Position = p; }
+        out.COUNT = String(n); out.UNTRAINED = String(u); r.data = out;
+        if (!String(r.score || '').trim()) r.score = String(userScore(n, u, out.Position));
+      }
+    });
+    const added = [];
+    for (const v of newOS) { const { data: res, error } = await sb.rpc('pm_list_add', { p_list: 'OS', p_value: v, p_rating: 1 }); if (!error && res && res.new) added.push(v); }
+    if (added.length) await loadLists();
+    return added;
+  }
+
+  // ---------- Costs for a visit ----------
+  const COST_CATS = ['IT ON THE GO BUDGET', 'TOOL/EQUIPMENT', 'MACHINE/DEVICE INSTALLED', 'TRANSPORTATION', 'OTHER'];
+  const costCats = () => listValues('COST CATEGORY') || COST_CATS;
+  const peso = (v) => '₱' + Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function addCostLine() {
+    const div = document.createElement('div'); div.className = 'costLine';
+    div.innerHTML = '<label>Category<select class="cCatSel"><option value="">Choose…</option>' + costCats().map(o => '<option>' + esc(o) + '</option>').join('') +
+        '<option value="' + NEW + '">(NEW) not on the list…</option></select>' +
+        '<input class="cCatNew caps hidden" placeholder="NEW CATEGORY" autocomplete="off" style="margin-top:6px"><span class="cHint note"></span></label>' +
+      '<label style="flex:2 1 220px">Description<input class="cDesc caps" placeholder="E.G. LAN CABLE CAT6 20M"></label>' +
+      '<label style="flex:0 1 90px">Qty<input class="cQty" type="number" min="0.01" step="any" value="1"></label>' +
+      '<label style="flex:0 1 140px">Unit cost (₱)<input class="cUnit" type="number" min="0" step="0.01"></label>' +
+      '<label style="flex:0 1 140px">Amount<input class="cAmt" readonly tabindex="-1" style="background:#F7F9F6"></label>' +
+      '<button type="button" class="cDel" aria-label="Remove this cost line">×</button>';
+    $('vCosts').appendChild(div); div.querySelectorAll('input.caps').forEach(capsInput); updateCostTotal();
+  }
+  function updateCostTotal() {
+    let t = 0, n = 0;
+    $('vCosts').querySelectorAll('.costLine').forEach(l => { const a = (+l.querySelector('.cQty').value || 0) * (+l.querySelector('.cUnit').value || 0); l.querySelector('.cAmt').value = a ? peso(a) : ''; t += a; n++; });
+    $('vCostTotal').textContent = n ? n + ' line' + (n === 1 ? '' : 's') + ' · total ' + peso(t) : '';
+  }
+  $('vAddCost').onclick = addCostLine;
+  $('vCosts').addEventListener('input', (ev) => {
+    const l = ev.target.closest('.costLine'); if (!l) return;
+    if (ev.target.classList.contains('cCatNew')) {
+      const v = caps(ev.target.value), c = closest(v, listValues('COST CATEGORY', true) || COST_CATS), h = l.querySelector('.cHint');
+      h.innerHTML = v && c ? (c === v ? 'Already on the list.' : '<span class="warn">Did you mean <b>' + esc(c) + '</b>?</span>') + ' <button type="button" class="secondary mini" data-use="' + esc(c) + '">Use ' + esc(c) + '</button>' : '';
+    }
+    updateCostTotal();
+  });
+  $('vCosts').addEventListener('change', (ev) => {
+    if (!ev.target.classList.contains('cCatSel')) return;
+    const nw = ev.target.parentElement.querySelector('.cCatNew'); nw.classList.toggle('hidden', ev.target.value !== NEW); if (ev.target.value === NEW) nw.focus();
+  });
+  $('vCosts').addEventListener('click', (ev) => {
+    const l = ev.target.closest('.costLine'); if (!l) return;
+    if (ev.target.classList.contains('cDel')) { l.remove(); updateCostTotal(); return; }
+    const u = ev.target.dataset && ev.target.dataset.use; if (!u) return;
+    const s = l.querySelector('.cCatSel'); if (!Array.from(s.options).some(o => o.value === u)) s.add(new Option(u, u), s.options.length - 1);
+    s.value = u; l.querySelector('.cCatNew').value = ''; l.querySelector('.cCatNew').classList.add('hidden'); l.querySelector('.cHint').innerHTML = '';
+  });
+  function readCostLines() {
+    const out = [];
+    for (const l of $('vCosts').querySelectorAll('.costLine')) {
+      const sel = l.querySelector('.cCatSel'), cat = sel.value === NEW ? caps(l.querySelector('.cCatNew').value) : sel.value;
+      const desc = caps(l.querySelector('.cDesc').value), qty = l.querySelector('.cQty').value, unit = l.querySelector('.cUnit').value;
+      if (!cat && !desc && unit === '') continue;                                   // empty line
+      if (!cat) return { error: 'Choose a category for every cost line.' };
+      if (unit === '' || +unit < 0) return { error: 'Enter the unit cost for "' + (desc || cat) + '".' };
+      if (!(+qty > 0)) return { error: 'Qty must be more than 0 for "' + (desc || cat) + '".' };
+      out.push({ where: 'Cost line ' + (out.length + 1), category: cat, description: desc, qty: qty, unit_cost: unit });
+    }
+    return { rows: out };
+  }
+
+  // ---------- Visit costs tab ----------
+  let costData = [];
+  const TOOL_CATS = ['TOOL/EQUIPMENT', 'MACHINE/DEVICE INSTALLED'];
+  async function loadCosts() {
+    const { data, error } = await sb.from('v_visit_costs').select('*').order('visit_date', { ascending: false }).limit(20000);
+    if (error) { $('cList').innerHTML = '<span class="err">' + esc(error.message) + (/v_visit_costs|does not exist/i.test(error.message) ? ' · Ask ITSD to run such_migration_01.sql in Supabase.' : '') + '</span>'; return; }
+    costData = data;
+    const y = $('cYear').value, k = $('cCat').value;
+    const years = Array.from(new Set(data.map(r => String(r.year)))).sort().reverse();
+    $('cYear').innerHTML = '<option value="">All years</option>' + years.map(v => '<option' + (v === y ? ' selected' : '') + '>' + v + '</option>').join('');
+    const cats = Array.from(new Set(costCats().concat(data.map(r => r.category))));
+    $('cCat').innerHTML = '<option value="">All categories</option>' + cats.map(v => '<option' + (v === k ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+    renderCosts();
+  }
+  function costFiltered() {
+    const y = $('cYear').value, q = $('cQ').value, k = $('cCat').value, b = $('cBranch').value.trim().toUpperCase();
+    return costData.filter(r => (!y || String(r.year) === y) && (!q || r.q === q) && (!k || r.category === k) && (!b || r.branch.indexOf(b) >= 0));
+  }
+  function renderCosts() {
+    const rows = costFiltered(), sum = (list) => list.reduce((a, r) => a + Number(r.amount || 0), 0);
+    const visits = new Set(rows.map(r => r.branch + '|' + r.visit_date)).size, total = sum(rows);
+    const kpi = (l, v, s) => '<div class="kpi"><b>' + l + '</b><span class="v" style="font-size:22px">' + v + '</span>' + (s ? '<span class="note">' + s + '</span>' : '') + '</div>';
+    $('cKpis').innerHTML = kpi('TOTAL SPEND', peso(total), rows.length + ' cost line' + (rows.length === 1 ? '' : 's')) +
+      kpi('IT ON THE GO BUDGET', peso(sum(rows.filter(r => r.category === 'IT ON THE GO BUDGET')))) +
+      kpi('TOOLS &amp; MACHINES', peso(sum(rows.filter(r => TOOL_CATS.includes(r.category))))) +
+      kpi('VISITS WITH COSTS', visits) + kpi('AVERAGE PER VISIT', visits ? peso(total / visits) : '—');
+    const byB = {}; rows.forEach(r => { const g = byB[r.branch] = byB[r.branch] || { v: new Set(), go: 0, tools: 0, other: 0, t: 0 };
+      const a = Number(r.amount || 0); g.v.add(r.visit_date); g.t += a;
+      if (r.category === 'IT ON THE GO BUDGET') g.go += a; else if (TOOL_CATS.includes(r.category)) g.tools += a; else g.other += a; });
+    const bl = Object.entries(byB).sort((a, b) => b[1].t - a[1].t);
+    $('cByBranch').innerHTML = bl.length ? '<table><tr><th>Branch</th><th>Visits</th><th>IT on the Go</th><th>Tools &amp; machines</th><th>Other</th><th>Total</th></tr>' +
+      bl.map(([b, g]) => '<tr><td>' + esc(b) + '</td><td class="num">' + g.v.size + '</td><td class="num">' + peso(g.go) + '</td><td class="num">' + peso(g.tools) + '</td><td class="num">' + peso(g.other) + '</td><td class="num"><b>' + peso(g.t) + '</b></td></tr>').join('') + '</table>'
+      : '<p class="note">No costs recorded for this filter.</p>';
+    const byC = {}; rows.forEach(r => { const g = byC[r.category] = byC[r.category] || { n: 0, t: 0 }; g.n++; g.t += Number(r.amount || 0); });
+    const cl = Object.entries(byC).sort((a, b) => b[1].t - a[1].t);
+    $('cByCat').innerHTML = cl.length ? '<table><tr><th>Category</th><th>Lines</th><th>Total</th><th>Share</th></tr>' +
+      cl.map(([c, g]) => '<tr><td>' + esc(c) + '</td><td class="num">' + g.n + '</td><td class="num">' + peso(g.t) + '</td><td class="num">' + (total ? Math.round(g.t / total * 100) : 0) + '%</td></tr>').join('') + '</table>'
+      : '<p class="note">—</p>';
+    $('cCount').textContent = rows.length + ' cost line' + (rows.length === 1 ? '' : 's') + (rows.length > 500 ? ' — showing the newest 500' : '');
+    $('cList').innerHTML = rows.length ? '<table><tr><th>Visit date</th><th>Branch</th><th>Category</th><th>Description</th><th>Qty</th><th>Unit cost</th><th>Amount</th><th>Source</th><th>Entered by</th></tr>' +
+      rows.slice(0, 500).map(r => '<tr><td>' + esc(r.visit_date) + '</td><td>' + esc(r.branch) + '</td><td>' + esc(r.category) + '</td><td style="white-space:normal">' + esc(r.description) + '</td><td class="num">' + Number(r.qty) +
+        '</td><td class="num">' + peso(r.unit_cost) + '</td><td class="num"><b>' + peso(r.amount) + '</b></td><td class="note">' + esc(r.source || '') + '</td><td class="note">' + esc(r.entered_by || '') + '</td></tr>').join('') + '</table>'
+      : '<p class="note">' + (costData.length ? 'No cost line matches.' : 'No costs recorded yet. Add them with the visit record.') + '</p>';
+  }
+  ['cYear', 'cQ', 'cCat'].forEach(id => $(id).onchange = renderCosts); $('cBranch').oninput = renderCosts;
+  $('cExport').onclick = () => {
+    const rows = costFiltered(); if (!rows.length) return;
+    const ws = XLSX.utils.json_to_sheet(rows.map(r => ({ 'Visit date': r.visit_date, Branch: r.branch, 'Office type': r.office_type, Year: r.year, Q: r.q, Category: r.category,
+      Description: r.description, Qty: Number(r.qty), 'Unit cost': Number(r.unit_cost), Amount: Number(r.amount), Source: r.source, 'Entered by': r.entered_by, 'Entered at': r.entered_at })));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Visit costs');
+    XLSX.writeFile(wb, 'SUCH_visit_costs_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  };
+
+  // ---------- Data history ----------
+  let dataHist = [];
+  (function fillHist() {
+    const y = new Date().getFullYear();
+    $('hYear').innerHTML = '<option value="">All years</option>' + [y, y - 1, y - 2, y - 3].map(v => '<option>' + v + '</option>').join('');
+    $('hMonth').innerHTML = '<option value="">All months</option>' + MONTH_NAMES.map((m, i) => '<option value="' + String(i + 1).padStart(2, '0') + '">' + m + '</option>').join('');
+  })();
+  async function loadDataHistory() {
+    let q = sb.from('v_data_records').select('*').order('date_of_inclusion', { ascending: false }).limit(5000);
+    if ($('hYear').value) q = q.eq('year', $('hYear').value);
+    if ($('hMonth').value) q = q.eq('month', $('hMonth').value);
+    if ($('hCat').value) q = q.eq('category', $('hCat').value);
+    const { data, error } = await q;
+    if (error) { $('hList').innerHTML = '<span class="err">' + esc(error.message) + '</span>'; return; }
+    dataHist = data; renderDataHistory();
+  }
+  function renderDataHistory() {
+    const s2 = $('hSearch').value.trim().toUpperCase();
+    let rows = dataHist.filter(r => (!s2 || r.branch.indexOf(s2) >= 0 || String(r.item_key).indexOf(s2) >= 0) &&
+      (!$('hYear').value || r.year === $('hYear').value) && (!$('hMonth').value || r.month === $('hMonth').value) && (!$('hCat').value || r.category === $('hCat').value));
+    if ($('hSort').value === 'branch') rows.sort((a, b) => a.branch.localeCompare(b.branch) || String(b.date_of_inclusion).localeCompare(String(a.date_of_inclusion)));
+    else rows.sort((a, b) => String(b.date_of_inclusion).localeCompare(String(a.date_of_inclusion)) || a.branch.localeCompare(b.branch));
+    $('hCount').textContent = rows.length + ' record' + (rows.length === 1 ? '' : 's') + (rows.length > 500 ? ' — showing the first 500' : '');
+    rows = rows.slice(0, 500);
+    $('hList').innerHTML = rows.length ? '<table><tr><th>Date of inclusion</th><th>Parameter</th><th>Branch</th><th>Serial / Employee</th><th>User</th><th>Score</th><th>RE</th><th>Source</th><th>Entered</th></tr>' +
+      rows.map(r => '<tr><td>' + esc(r.date_of_inclusion) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.branch) + '</td><td>' + esc(r.item_key) + '</td><td>' + esc(r.user_name || '') +
+        '</td><td class="num">' + Number(r.score).toFixed(2) + '</td><td>' + chip(r.band) + '</td><td class="note">' + esc(r.source || '') + '</td><td class="note">' + new Date(r.entered_at).toLocaleString() + '</td></tr>').join('') + '</table>'
+      : '<p class="note">No data records match.</p>';
+  }
+  ['hYear', 'hMonth', 'hCat'].forEach(id => $(id).onchange = loadDataHistory);
+  $('hSort').onchange = renderDataHistory; $('hSearch').oninput = renderDataHistory;
+
+  async function loadHistory() {
+    const c = client(); if (!c) return;
+    const { data, error } = await c.from('import_batches')
+      .select('batch_id, source_file, imported_at, rows_read, appended, skipped, rejected')
+      .order('batch_id', { ascending: false }).limit(20);
+    if (error) { $('history').innerHTML = '<span class="err">' + esc(error.message) + '</span>'; return; }
+    if (!data.length) { $('history').innerHTML = '<p class="note">No imports yet.</p>'; return; }
+    $('history').innerHTML = '<table><tr><th>Batch</th><th>File</th><th>Imported at</th><th>Read</th><th>Appended</th><th>Skipped</th><th>Rejected</th></tr>' +
+      data.map(b => '<tr><td>' + b.batch_id + '</td><td>' + esc(b.source_file) + '</td><td>' + new Date(b.imported_at).toLocaleString() +
+        '</td><td>' + b.rows_read + '</td><td>' + b.appended + '</td><td>' + b.skipped + '</td><td>' + b.rejected + '</td></tr>').join('') + '</table>';
+  }
+  $('refresh').onclick = loadHistory;
+
+  (async () => { const { data } = await sb.auth.getSession(); setSignedIn(data.session ? data.session.user.email : ''); })();
+})();
+</script>
+</body>
+</html>
